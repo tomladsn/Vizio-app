@@ -1,0 +1,207 @@
+.gate-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.gate-card {
+  background: var(--bg-raised);
+  border: 0.5px solid var(--border-mid);
+  border-radius: 16px;
+  padding: 32px 36px;
+  width: 480px;
+  max-width: 95vw;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+}
+
+.gate-logo {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--green-text);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.gate-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.gate-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: -10px;
+}
+
+.gate-projects {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.gate-project-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-base);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+  width: 100%;
+}
+
+.gate-project-row:hover {
+  border-color: var(--green-border);
+  background: rgba(29,158,117,0.05);
+}
+
+.gpr-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--green-dim);
+  color: var(--green-text);
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.gpr-info { flex: 1; min-width: 0; }
+.gpr-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+.gpr-path {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gpr-arrow { font-size: 14px; color: var(--text-muted); flex-shrink: 0; }
+
+.gate-new-btn {
+  padding: 9px;
+  border: 0.5px dashed var(--border-mid);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.gate-new-btn:hover { border-color: var(--green-border); color: var(--green-text); }
+
+.gate-form { display: flex; flex-direction: column; gap: 8px; }
+.gate-label { font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.gate-input {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--bg-base);
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.gate-input:focus { border-color: var(--green-border); }
+
+.gate-path-row { display: flex; gap: 6px; }
+.gate-path-row .path-input { flex: 1; cursor: pointer; }
+
+.gate-browse-btn {
+  padding: 9px 14px;
+  background: var(--bg-overlay);
+  border: 0.5px solid var(--border-mid);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.gate-browse-btn:hover { border-color: var(--green-border); color: var(--green-text); }
+
+.gate-preview-path {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.gate-preview-path code {
+  color: var(--green-text);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.gate-error {
+  font-size: 12px;
+  color: var(--red-text);
+  background: var(--red-dim);
+  border: 0.5px solid rgba(226,75,74,0.2);
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+
+.gate-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.gate-back-btn {
+  padding: 9px 16px;
+  background: transparent;
+  border: 0.5px solid var(--border-mid);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.gate-create-btn {
+  padding: 9px 22px;
+  background: var(--green-text);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.gate-create-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.gate-spinner {
+  width: 28px; height: 28px;
+  border: 2px solid var(--border);
+  border-top-color: var(--green-text);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }

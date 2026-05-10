@@ -1,0 +1,132 @@
+.menubar {
+  height: 36px;
+  background: var(--bg-surface);
+  border-bottom: 0.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  gap: 4px;
+  -webkit-app-region: drag;
+  user-select: none;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.menubar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.menubar-arrows {
+  display: flex;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.menubar-project {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px;
+  background: var(--bg-overlay);
+  border: 0.5px solid var(--border-mid);
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.menubar-project:hover {
+  border-color: var(--green-border);
+  background: rgba(29,158,117,0.05);
+}
+
+.project-icon {
+  width: 18px;
+  height: 18px;
+  background: var(--green-dim);
+  color: var(--green-text);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.project-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-switch {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.nav-arrow {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 0.5px solid var(--border);
+  background: none;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.nav-arrow:hover:not(.disabled) {
+  background: rgba(255,255,255,0.07);
+  color: var(--text-primary);
+}
+
+.nav-arrow.disabled {
+  color: var(--text-hint);
+  cursor: default;
+  border-color: transparent;
+}
+
+.menubar-nav {
+  display: flex;
+  gap: 1px;
+  -webkit-app-region: no-drag;
+}
+
+.menu-item {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+}
+
+.menu-item:hover {
+  background: rgba(255,255,255,0.07);
+  color: var(--text-primary);
+}
+
+.menu-item.active {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.08);
+}
+
+.menubar-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--text-hint);
+  pointer-events: none;
+}

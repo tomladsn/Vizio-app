@@ -1,0 +1,262 @@
+import React, { useState, useEffect, useRef } from 'react'
+import './MediaLibrary.css'
+
+const MEDIA_COLORS = {
+  mp4:'#5C6BC0', mov:'#5C6BC0', avi:'#5C6BC0', mkv:'#5C6BC0', webm:'#5C6BC0',
+  mp3:'#26A69A', wav:'#26A69A', flac:'#26A69A', aac:'#26A69A', m4a:'#26A69A',
+  png:'#EF6C00', jpg:'#EF6C00', jpeg:'#EF6C00', webp:'#EF6C00', gif:'#EF6C00',
+}
+
+export default function MediaLibrary({ project, activeFile, onSelectFile, onMentionFile, onMentionFiles, onDeleteFile, onFilesChange, reloadTrigger }) {
+  const [files,     setFiles]     = useState([])
+  const [dragging,  setDragging]  = useState(false)
+  const [copying,   setCopying]   = useState(false)
+  const [selected,  setSelected]  = useState(new Set())
+  const [selectMode, setSelectMode] = useState(false)
+  const dropRef = useRef(null)
+
+  // Load project media on mount and when project changes
+  useEffect(() => {
+    if (!project) return
+    loadMedia()
+  }, [project, reloadTrigger])
+
+  async function loadMedia() {
+    const media = await window.electron.project.getMedia(project.folderPath)
+    setFiles(media)
+    onFilesChange?.(media)
+    // Clean up selected set – remove paths that no longer exist
+    setSelected(prev => {
+      const validPaths = new Set(media.map(f => f.path))
+      const next = new Set([...prev].filter(p => validPaths.has(p)))
+      if (next.size === 0) setSelectMode(false)
+      return next
+    })
+  }
+
+  // Drag and drop
+  function onDragOver(e) { e.preventDefault(); setDragging(true) }
+  function onDragLeave() { setDragging(false) }
+
+  async function onDrop(e) {
+    e.preventDefault()
+    setDragging(false)
+    const dropped = Array.from(e.dataTransfer.files)
+    if (!dropped.length) return
+    setCopying(true)
+    for (const f of dropped) {
+      await window.electron.project.copyMedia(f.path, project.folderPath)
+    }
+    await loadMedia()
+    setCopying(false)
+  }
+
+  async function handleAddMore() {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.multiple = true
+    input.accept = 'video/*,audio/*,image/*'
+    input.onchange = async () => {
+      const picked = Array.from(input.files)
+      if (!picked.length) return
+      setCopying(true)
+      for (const f of picked) {
+        await window.electron.project.copyMedia(f.path, project.folderPath)
+      }
+      await loadMedia()
+      setCopying(false)
+    }
+    input.click()
+  }
+
+  async function handleDelete(file) {
+    const ok = window.confirm(`Delete "${file.name}" from this project?`)
+    if (!ok) return
+
+    const result = await window.electron.project.deleteMedia(file.path, project.folderPath)
+    if (!result?.ok) {
+      window.alert(result?.message || 'Could not delete this file.')
+      return
+    }
+    if (activeFile?.path === file.path) onDeleteFile?.(file)
+    await loadMedia()
+  }
+
+  function toggleFileSelected(filePath) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(filePath)) {
+        next.delete(filePath)
+      } else {
+        next.add(filePath)
+      }
+      if (next.size === 0) setSelectMode(false)
+      return next
+    })
+  }
+
+  function handleSelectAll() {
+    setSelected(new Set(files.map(f => f.path)))
+  }
+
+  function handleSelectNone() {
+    setSelected(new Set())
+    setSelectMode(false)
+  }
+
+  function handleSendSelectedToChat() {
+    const selectedFiles = files.filter(f => selected.has(f.path))
+    if (selectedFiles.length === 0) return
+    const names = selectedFiles.map(f => f.name)
+    onMentionFiles?.(names)
+    setSelected(new Set())
+    setSelectMode(false)
+  }
+
+  return (
+    <div
+      ref={dropRef}
+      className={`library ${dragging ? 'dragging' : ''}`}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      <div className="library-header">
+        <span className="section-label">Media</span>
+        {files.length > 0 && (
+          <>
+            <button
+              className={`select-mode-btn ${selectMode ? 'active' : ''}`}
+              title={selectMode ? 'Exit select mode' : 'Select files'}
+              onClick={() => {
+                if (selectMode) {
+                  setSelectMode(false)
+                  setSelected(new Set())
+                } else {
+                  setSelectMode(true)
+                }
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.2" />
+                {selectMode && <path d="M3 6l2 2 4-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />}
+              </svg>
+            </button>
+            <span className="file-count">{files.length} file{files.length !== 1 ? 's' : ''}</span>
+          </>
+        )}
+      </div>
+
+      {selectMode && files.length > 0 && (
+        <div className="select-controls">
+          <button className="select-ctrl-btn" onClick={handleSelectAll}>All</button>
+          <button className="select-ctrl-btn" onClick={handleSelectNone}>None</button>
+          <span className="select-count">{selected.size} selected</span>
+        </div>
+      )}
+
+      {files.length === 0 ? (
+        <div className="empty-library" onClick={handleAddMore}>
+          <div className="empty-icon">⬇</div>
+          <div className="empty-title">Drop media files here</div>
+          <div className="empty-sub">They'll be copied into your project</div>
+        </div>
+      ) : (
+        <div className="file-list">
+          {files.map(file => (
+            <FileRow
+              key={file.path}
+              file={file}
+              active={activeFile?.path === file.path}
+              selectMode={selectMode}
+              isSelected={selected.has(file.path)}
+              onToggleSelect={() => {
+                if (!selectMode) setSelectMode(true)
+                toggleFileSelected(file.path)
+              }}
+              onSelect={() => onSelectFile(file)}
+              onMention={() => onMentionFile?.(file.name)}
+              onDelete={() => handleDelete(file)}
+            />
+          ))}
+        </div>
+      )}
+
+      {files.length > 0 && !selectMode && (
+        <button className="add-more-btn" onClick={handleAddMore}>
+          + add more files
+        </button>
+      )}
+
+      {selectMode && selected.size > 0 && (
+        <div className="select-action-bar">
+          <button className="select-send-btn" onClick={handleSendSelectedToChat}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Send {selected.size} to chat
+          </button>
+        </div>
+      )}
+
+      {copying && (
+        <div className="lib-copying">
+          <div className="lib-copy-spinner" />
+          Copying to project…
+        </div>
+      )}
+
+      {dragging && (
+        <div className="drag-overlay">
+          <div className="drag-hint">Drop to add</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FileRow({ file, active, selectMode, isSelected, onToggleSelect, onSelect, onMention, onDelete }) {
+  return (
+    <div
+      className={`file-item ${active ? 'active' : ''} ${isSelected ? 'selected' : ''}`}
+      onClick={selectMode ? onToggleSelect : onSelect}
+    >
+      {selectMode && (
+        <div className="file-checkbox" onClick={e => { e.stopPropagation(); onToggleSelect() }}>
+          <div className={`checkbox-box ${isSelected ? 'checked' : ''}`}>
+            {isSelected && (
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M2 5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
+          </div>
+        </div>
+      )}
+      <div className={`file-thumb ext-${file.ext}`}>
+        {file.ext.toUpperCase().slice(0, 3)}
+      </div>
+      <div className="file-meta">
+        <div className="file-name" title={file.name}>{file.name}</div>
+        <div className="file-info">{file.size} · .{file.ext}</div>
+      </div>
+      {!selectMode && (
+        <div className="file-actions">
+          <button
+            className="file-action-btn context-btn"
+            title="Mention in chat"
+            onClick={e => { e.stopPropagation(); onMention() }}
+          >
+            <span style={{ fontSize: '14px' }}>@</span>
+          </button>
+          <button
+            className="file-action-btn remove-btn"
+            title="Delete file"
+            onClick={e => { e.stopPropagation(); onDelete() }}
+          >
+            <span style={{ fontSize: '14px' }}>x</span>
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
