@@ -2,9 +2,9 @@
 
 <img src="icon.png" alt="Visio Media Agent" width="100" />
 
-# Visio Media Agent
+# Vizio
 
-**An AI-powered desktop application for intelligent, automated media processing**
+**AI-powered desktop application for intelligent, automated media processing**
 
 [![Electron](https://img.shields.io/badge/Electron-28-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://reactjs.org/)
@@ -18,7 +18,7 @@
 
 ## ✨ Overview
 
-**Visio Media Agent** is a desktop application that turns natural language instructions into fully automated media-processing workflows. Describe what you want in plain English — *"compress this video to under 50 MB"*, *"transcribe and subtitle all these clips"*, *"extract the audio and normalize the volume"* — and the AI agent generates, executes, and self-corrects an ffmpeg/tool pipeline without you needing to touch the command line.
+**Vizio** is a desktop application that turns natural language instructions into fully automated media-processing workflows. Describe what you want in plain English — *"compress this video to under 50 MB"*, *"transcribe and subtitle all these clips"*, *"extract the audio and normalize the volume"* — and the AI agent generates, executes, and self-corrects an ffmpeg/tool pipeline without you needing to touch the command line.
 
 Under the hood it uses **Groq**, **Anthropic (Claude)**, **OpenAI**, or a **local Ollama** model as the reasoning engine, and delegates the heavy lifting to battle-tested media tools like `ffmpeg`, `whisper`, `yt-dlp`, and `ImageMagick`.
 
@@ -249,6 +249,6 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 <div align="center">
 
-Built with ❤️ using [Electron](https://www.electronjs.org/), [React](https://reactjs.org/), [Vite](https://vitejs.dev/), and the power of AI.
+Vizio — built with ❤️ using [Electron](https://www.electronjs.org/), [React](https://reactjs.org/), [Vite](https://vitejs.dev/), and the power of AI.
 
 </div>
