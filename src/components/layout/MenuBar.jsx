@@ -36,7 +36,7 @@ export default function MenuBar({ activePage, onNavigate, canGoBack, canGoForwar
 
         {projectName && (
           <div className="menubar-project" onClick={onChangeProject} title="Switch project">
-            <span className="project-icon">V</span>
+            <img src="/src/assets/logo.png" className="project-icon-img" alt="V" />
             <span className="project-name">{projectName}</span>
             <span className="project-switch">↓</span>
           </div>

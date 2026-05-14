@@ -1,5 +1,7 @@
 .exec-bar {
-  height: 110px;
+  min-height: 110px;
+  height: auto;
+  max-height: 180px;
   flex-shrink: 0;
   background: var(--bg-surface);
   border-top: 0.5px solid var(--border);
@@ -136,4 +138,96 @@
   width: 28px;
   text-align: right;
   flex-shrink: 0;
+}
+
+/* ── Pending workflow preview in session panel ── */
+.pending-preview {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 0.5px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pending-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--amber-text);
+}
+
+.pending-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--amber-text);
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+.pending-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pending-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+}
+
+.pending-step-num {
+  min-width: 13px; height: 13px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-hint);
+  font-size: 9px;
+  font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.pending-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.pending-step-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.pending-step-cmd {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--amber-text);
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pending-step-more {
+  color: var(--text-hint);
+  font-size: 9px;
+  padding-left: 18px;
+  font-style: italic;
 }

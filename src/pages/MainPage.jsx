@@ -25,6 +25,7 @@ export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSe
     })
   }
   const [showChats, setShowChats] = useState(false)
+  const [pendingWorkflow, setPendingWorkflow] = useState(null)
   const mentionFnRef = useRef(null)
 
   useEffect(() => {
@@ -222,11 +223,12 @@ export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSe
             attachedFiles={attachedFiles}
             onClearAttachments={(names) => setAttachedFiles(names ?? [])}
             onMentionFiles={handleAttachFiles}
+            onPendingWorkflow={setPendingWorkflow}
           />
         </div>
       </div>
 
-      <ExecutionBar tasks={tasks} />
+      <ExecutionBar tasks={tasks} pendingWorkflow={pendingWorkflow} />
     </div>
   )
 }

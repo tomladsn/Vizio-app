@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { settingsStore } from '../../store/settingsStore'
 import './ExecutionBar.css'
 
-export default function ExecutionBar({ tasks = [] }) {
+export default function ExecutionBar({ tasks = [], pendingWorkflow = null }) {
   const [config, setConfig] = useState(settingsStore.getActiveConfig())
+  const pendingSteps = pendingWorkflow?.steps ?? []
 
   useEffect(() => {
     return settingsStore.subscribe(() => {
@@ -34,6 +35,36 @@ export default function ExecutionBar({ tasks = [] }) {
             {config.isLocal ? 'local' : hasKey && hasModel ? 'ready' : 'not configured'}
           </span>
         </div>
+
+        {pendingWorkflow && pendingSteps.length > 0 && (
+          <div className="pending-preview">
+            <div className="pending-label">
+              <span className="pending-dot" />
+              Pending approval - {pendingSteps.length} step{pendingSteps.length !== 1 ? 's' : ''}
+            </div>
+            <div className="pending-steps">
+              {pendingSteps.slice(0, 4).map((step, i) => {
+                const cmd = step.command || null
+                return (
+                  <div key={step.id ?? i} className="pending-step" title={cmd || step.title}>
+                    <span className="pending-step-num">{i + 1}</span>
+                    <div className="pending-step-body">
+                      <span className="pending-step-title">{step.title}</span>
+                      {cmd && (
+                        <span className="pending-step-cmd">{cmd}</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+              {pendingSteps.length > 4 && (
+                <div className="pending-step pending-step-more">
+                  +{pendingSteps.length - 4} more
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="exec-tasks">
@@ -45,7 +76,7 @@ export default function ExecutionBar({ tasks = [] }) {
         </div>
 
         {tasks.length === 0 ? (
-          <div className="exec-idle">No tasks yet — describe an edit in the chat</div>
+          <div className="exec-idle">No tasks yet -- describe an edit in the chat</div>
         ) : (
           <div className="task-list">
             {tasks.map(task => (
@@ -59,8 +90,8 @@ export default function ExecutionBar({ tasks = [] }) {
 }
 
 function TaskRow({ task }) {
-  const totalSteps  = task.steps?.length ?? 0
-  const doneSteps   = task.steps?.filter(s => s.status === 'done').length ?? 0
+  const totalSteps = task.steps?.length ?? 0
+  const doneSteps = task.steps?.filter(s => s.status === 'done').length ?? 0
   const failedSteps = task.steps?.filter(s => s.status === 'failed').length ?? 0
   const runningStep = task.steps?.find(s => s.status === 'running')
 
@@ -69,22 +100,22 @@ function TaskRow({ task }) {
   )
 
   const isCompleted = task.status === 'done'
-  const isFailed    = task.status === 'failed'  || failedSteps > 0
-  const isRunning   = task.status === 'running'
+  const isFailed = task.status === 'failed' || failedSteps > 0
+  const isRunning = task.status === 'running'
 
   const barColor = isFailed
     ? 'var(--red-text)'
     : isCompleted
-    ? 'var(--green)'
-    : 'var(--purple)'
+      ? 'var(--green)'
+      : 'var(--purple)'
 
   const statusLabel = isFailed
     ? 'failed'
     : isCompleted
-    ? 'done'
-    : isRunning && totalSteps > 0
-    ? `step ${doneSteps + 1}/${totalSteps}`
-    : 'waiting'
+      ? 'done'
+      : isRunning && totalSteps > 0
+        ? `step ${doneSteps + 1}/${totalSteps}`
+        : 'waiting'
 
   return (
     <div className={`task-row ${isCompleted ? 'completed' : ''} ${isFailed ? 'failed' : ''}`}>

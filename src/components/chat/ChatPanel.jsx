@@ -52,7 +52,7 @@ function buildProjectStateBlock(projectFiles = [], outputFiles = [], projectDir 
 
 function buildSystemPrompt(toolsBlock, fileBlock, projectStateBlock, outputDir, workflowBlock = '') {
   return `You are Visio, a desktop media processing AGENT with direct control over the project folder.
-You are not a chatbot — you are an autonomous agent that can read, write, rename, move and delete files inside the project.
+You are not a chatbot -- you are an autonomous agent that can read, write, rename, move and delete files inside the project.
 
 ${toolsBlock}
 
@@ -82,21 +82,21 @@ All output files must be saved here unless the user specifies otherwise. Use ful
 
 ## AGENT STEP TYPES
 Workflow steps can use these types in addition to shell commands:
-- "shell" (default) — runs any system command (ffmpeg, whisper, yt-dlp, etc.)
-- "rename" — renames a file inside the project. Fields: "from" (current abs path), "to" (new abs path)
-- "delete" — permanently deletes a file inside the project. Fields: "path"
-- "move"   — moves a file to another project subfolder. Fields: "from", "to"
-- "write"  — writes a text file (subtitles, notes, scripts). Fields: "path", "content"
+- "shell" (default) -- runs any system command (ffmpeg, whisper, yt-dlp, etc.)
+- "rename" -- renames a file inside the project. Fields: "from" (current abs path), "to" (new abs path)
+- "delete" -- permanently deletes a file inside the project. Fields: "path"
+- "move"   -- moves a file to another project subfolder. Fields: "from", "to"
+- "write"  -- writes a text file (subtitles, notes, scripts). Fields: "path", "content"
 All paths for non-shell steps must be absolute and inside the project folder.
 
 ## PLATFORM
 Windows 10/11. All shell commands run in PowerShell / cmd.exe.
 NEVER use bash/Linux syntax: no \`for f in *.ext\`, no \`%f\`, no \`&&\`, no \`mkdir -p\`.
-For batch operations: create ONE STEP PER FILE using the exact absolute paths from PROJECT STATE — do NOT write shell loops.
-The output folder already exists — never create it with a command.
+For batch operations: create ONE STEP PER FILE using the exact absolute paths from PROJECT STATE -- do NOT write shell loops.
+The output folder already exists -- never create it with a command.
 
 ## RULES
-1. Respond ONLY with a JSON object and nothing else — no markdown, no explanation before or after.
+1. Respond ONLY with a JSON object and nothing else -- no markdown, no explanation before or after.
 2. Always use -y in ffmpeg commands.
 3. Use full absolute paths for all input and output files.
 4. Output files go in the output directory above unless the user says otherwise.
@@ -107,7 +107,7 @@ The output folder already exists — never create it with a command.
 9. A workflow response is a proposed plan. The app will ask for confirmation before running.
 10. For downloads or transcodes, ask a clarifying question first if important preferences are missing.
 11. If a file is mentioned with @ in the chat, the @ is only mention syntax. Never include @ in the real filename or path.
-12. Do not say "as an AI", "I cannot directly", or similar disclaimers. You are an agent — act like one.
+12. Do not say "as an AI", "I cannot directly", or similar disclaimers. You are an agent -- act like one.
 13. When a workflow finishes, you can propose follow-up actions based on the new output files.
 14. You can clean up intermediate/temp files using delete steps after a workflow completes.
 15. For batch jobs (e.g. convert all images), list all source file paths from PROJECT STATE and create one workflow step per file.
@@ -531,33 +531,21 @@ function buildFileBlock(activeFile, probeData, projectFiles = [], inputText = ''
   return block || '## No file loaded'
 }
 
-function buildExecutionSummary(workflow) {
-  const lines = [workflow.message || 'I drafted a workflow for this task.']
+function buildCompletionSummary(workflow) {
+  const lines = ['Done! Here\'s what was executed:']
   lines.push('')
-  lines.push(`Planned steps: ${workflow.steps.length}`)
-  workflow.steps.slice(0, 4).forEach((step, index) => {
+  workflow.steps.slice(0, 6).forEach((step, index) => {
     lines.push(`${index + 1}. ${step.title}`)
   })
-  if (workflow.steps.length > 4) {
-    lines.push(`+ ${workflow.steps.length - 4} more step(s)`)
+  if (workflow.steps.length > 6) {
+    lines.push(`+ ${workflow.steps.length - 6} more step(s)`)
   }
-  lines.push('')
-  lines.push('Reply `run it` to execute, or tell me what to change first.')
+  if (workflow.final_output) {
+    const fname = String(workflow.final_output).replace(/\\/g, '/').split('/').pop()
+    lines.push('')
+    lines.push(`Output: **${fname}**`)
+  }
   return lines.join('\n')
-}
-
-function isRunConfirmation(text) {
-  const normalized = text.trim().toLowerCase()
-  return [
-    'run it',
-    'run',
-    'go ahead',
-    'execute',
-    'start',
-    'proceed',
-    'yes run it',
-    'do it',
-  ].includes(normalized)
 }
 
 async function callAI(messages, config, retries = 2, signal) {
@@ -728,6 +716,7 @@ export default function ChatPanel({
   onWorkflowComplete,
   attachedFiles = [],
   onClearAttachments,
+  onPendingWorkflow,
 }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -831,6 +820,8 @@ export default function ChatPanel({
       message: workflow.message || 'Workflow drafted and waiting for confirmation.',
     }
     onSessionId?.(sid)
+    // Expose the pending steps to the ExecutionBar session panel
+    onPendingWorkflow?.(workflow)
     await window.electron.prepareWorkflow({
       workflow,
       sessionId: sid,
@@ -838,7 +829,12 @@ export default function ChatPanel({
       userGoal: lastInputRef.current,
       mediaFiles: getRequestedFiles(lastInputRef.current, projectFiles, attachedFiles).map(file => file.path),
     })
-    addAiMessage(buildExecutionSummary(workflow))
+    // Show inline approval card instead of a text prompt
+    setMessages(prev => {
+      const card = { id: Date.now() + 2, role: 'ai', type: 'approval', workflow }
+      const next = [...prev, card]
+      return next
+    })
   }
 
   function startWorkflowExecution(workflow, sid) {
@@ -848,6 +844,8 @@ export default function ChatPanel({
       status: 'running',
       message: workflow.message || 'Workflow is running.',
     }
+    // Clear pending workflow from sidebar now that it's running
+    onPendingWorkflow?.(null)
 
     const logSteps = workflow.steps.map(step => ({
       id: step.id,
@@ -857,9 +855,11 @@ export default function ChatPanel({
       pct: 0,
     }))
 
+    // Use the AI's workflow message as the task name in the ExecutionBar
+    const taskName = workflow.message || lastInputRef.current
     onTaskUpdate?.(prev => [...prev, {
       id: Date.now(),
-      goal: lastInputRef.current,
+      goal: taskName,
       status: 'running',
       steps: logSteps,
     }])
@@ -935,7 +935,10 @@ export default function ChatPanel({
           message: 'The last workflow completed successfully.',
         }
         onWorkflowComplete?.()
-        addAiMessage('All done! Check the **output files** tab for created media, or the **session log** for command output.')
+        const summary = currentWorkflowRef.current
+          ? buildCompletionSummary(currentWorkflowRef.current)
+          : 'All done! Check the **output files** tab for created media.'
+        addAiMessage(summary)
       } else {
         workflowStateRef.current = {
           status: 'failed',
@@ -951,6 +954,26 @@ export default function ChatPanel({
       u3?.()
     }
   }, [onTaskUpdate])
+
+  function handleApprove() {
+    const workflow = pendingWorkflowRef.current
+    if (!workflow) return
+    const sid = pendingSessionIdRef.current || new Date().toISOString().replace(/[:.]/g, '-')
+    pendingWorkflowRef.current = null
+    pendingSessionIdRef.current = null
+    // Remove the approval card from messages
+    setMessages(prev => prev.filter(m => m.type !== 'approval'))
+    setLoading(true)
+    startWorkflowExecution(workflow, sid)
+  }
+
+  function handleDismiss() {
+    pendingWorkflowRef.current = null
+    pendingSessionIdRef.current = null
+    onPendingWorkflow?.(null)
+    setMessages(prev => prev.filter(m => m.type !== 'approval'))
+    addAiMessage('Workflow dismissed. Let me know if you\'d like to try something different.')
+  }
 
   async function handleSend() {
     const text = input.trim()
@@ -989,17 +1012,6 @@ export default function ChatPanel({
     historyRef.current = [...historyRef.current, { role: 'user', content: fullText }]
     persistChat(nextMsgs, historyRef.current, currentChatId.current)
 
-    if (pendingWorkflowRef.current && isRunConfirmation(text)) {
-      const workflow = pendingWorkflowRef.current
-      const sid = pendingSessionIdRef.current || new Date().toISOString().replace(/[:.]/g, '-')
-      pendingWorkflowRef.current = null
-      pendingSessionIdRef.current = null
-      addAiMessage('Starting the approved workflow now.')
-      setLoading(true)
-      startWorkflowExecution(workflow, sid)
-      return
-    }
-
     pendingWorkflowRef.current = null
 
     setLoading(true)
@@ -1037,7 +1049,7 @@ export default function ChatPanel({
       let parsed = normalizeAIResponse(parseAIResponse(raw))
       let responseForHistory = raw
 
-      // ── Auto-retry if the response isn't valid JSON ──────────────────────────
+      // -- Auto-retry if the response isn't valid JSON --------------------------
       if (!parsed) {
         const fixMessages = [
           ...buildRequestMessages(systemPrompt, historyRef.current),
@@ -1045,7 +1057,7 @@ export default function ChatPanel({
           {
             role: 'user',
             content:
-              'Your last response was not valid JSON. You MUST respond with ONLY a raw JSON object — ' +
+              'Your last response was not valid JSON. You MUST respond with ONLY a raw JSON object -- ' +
               'no markdown fences, no explanation, no text before or after the JSON. ' +
               'Try again now.',
           },
@@ -1057,7 +1069,7 @@ export default function ChatPanel({
           parsed = normalizeAIResponse(parseAIResponse(raw2))
           if (parsed) responseForHistory = raw2
         } catch (_) {
-          // retry failed — fall through to the error below
+          // retry failed -- fall through to the error below
         }
       }
 
@@ -1076,7 +1088,13 @@ export default function ChatPanel({
       }
 
       if (parsed.mode === 'workflow') {
-        await queueWorkflowForConfirmation(expandBatchSteps(parsed), sid)
+        const expandedWorkflow = expandBatchSteps(parsed)
+        // Name the chat after the AI's workflow message on first real task
+        if (currentTitleRef.current === 'New chat' || looksGeneric(currentTitleRef.current)) {
+          const taskTitle = shortenTitle(expandedWorkflow.message || fullText)
+          currentTitleRef.current = taskTitle
+        }
+        await queueWorkflowForConfirmation(expandedWorkflow, sid)
         setLoading(false)
         return
       }
@@ -1100,6 +1118,9 @@ export default function ChatPanel({
     }
   }
 
+  const config = settingsStore.getActiveConfig()
+  const isReady = config.isLocal || !!config.apiKey?.trim()
+
   return (
     <div className="chat-panel">
       <div className="messages">
@@ -1110,7 +1131,11 @@ export default function ChatPanel({
             <div className="chat-empty-sub">Describe an edit, ask a question, or mention a file with @</div>
           </div>
         )}
-        {messages.map(message => <Message key={message.id} msg={message} />)}
+        {messages.map(message => (
+          message.type === 'approval'
+            ? <ApprovalCard key={message.id} workflow={message.workflow} onAllow={handleApprove} onDismiss={handleDismiss} />
+            : <Message key={message.id} msg={message} />
+        ))}
         <div ref={endRef} />
       </div>
 
@@ -1124,7 +1149,20 @@ export default function ChatPanel({
         </div>
       )}
 
-      <div className="chat-input-wrap">
+      {!isReady && (
+        <div className="chat-gate">
+          <div className="chat-gate-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.6"/>
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div className="chat-gate-title">API key required</div>
+          <div className="chat-gate-body">Go to <strong>Settings</strong> and add your {config.label} API key to start chatting.</div>
+        </div>
+      )}
+
+      <div className={`chat-input-wrap ${!isReady ? 'chat-input-blocked' : ''}`}>
         {attachedFiles.length > 0 && (
           <div
             className="chat-attachments"
@@ -1159,9 +1197,9 @@ export default function ChatPanel({
           <textarea
             ref={inputRef}
             className="chat-input"
-            placeholder="Describe an edit or ask anything..."
+            placeholder={isReady ? 'Describe an edit or ask anything...' : 'Add an API key in Settings to start...'}
             value={input}
-            disabled={loading}
+            disabled={loading || !isReady}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             rows={1}
@@ -1170,11 +1208,83 @@ export default function ChatPanel({
             className={`send-btn ${loading ? 'loading' : ''}`}
             onClick={loading ? handleStop : handleSend}
             title={loading ? 'Stop' : 'Send'}
+            disabled={!isReady && !loading}
           >
             {loading ? <StopIcon /> : <SendIcon />}
           </button>
         </div>
         <div className="input-hint">Enter to send · Shift+Enter for new line · Use @ to mention files</div>
+      </div>
+    </div>
+  )
+}
+
+function ApprovalCard({ workflow, onAllow, onDismiss }) {
+  const [expanded, setExpanded] = useState(null)
+  const steps = workflow?.steps ?? []
+
+  function getStepCmd(step) {
+    if (step.command) return step.command
+    if (step.type === 'rename') return `rename  "${step.from}"  ->  "${step.to}"`
+    if (step.type === 'delete') return `delete  "${step.path}"`
+    if (step.type === 'move')   return `move  "${step.from}"  ->  "${step.to}"`
+    if (step.type === 'write')  return `write  "${step.path}"`
+    return null
+  }
+
+  return (
+    <div className="approval-card">
+      <div className="approval-header">
+        <div className="approval-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6"/>
+          </svg>
+        </div>
+        <div className="approval-title">Workflow ready</div>
+        <span className="approval-step-count">{steps.length} step{steps.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div className="approval-summary">{workflow?.message || 'Ready to execute.'}</div>
+      {steps.length > 0 && (
+        <div className="approval-steps">
+          {steps.map((step, i) => {
+            const cmd = getStepCmd(step)
+            const isOpen = expanded === i
+            return (
+              <div key={step.id ?? i} className={`approval-step ${cmd ? 'has-cmd' : ''} ${isOpen ? 'open' : ''}`}>
+                <div
+                  className="approval-step-header"
+                  onClick={() => cmd && setExpanded(isOpen ? null : i)}
+                  role={cmd ? 'button' : undefined}
+                  title={cmd ? (isOpen ? 'Hide command' : 'Show command') : undefined}
+                >
+                  <span className="approval-step-num">{i + 1}</span>
+                  <span className="approval-step-title">{step.title}</span>
+                  {cmd && (
+                    <svg
+                      className={`approval-chevron ${isOpen ? 'up' : ''}`}
+                      width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"
+                    >
+                      <path d="M2 4l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+                {isOpen && cmd && (
+                  <div className="approval-cmd">{cmd}</div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+      <div className="approval-actions">
+        <button className="approval-btn allow" onClick={onAllow}>
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Allow
+        </button>
+        <button className="approval-btn dismiss" onClick={onDismiss}>Dismiss</button>
       </div>
     </div>
   )

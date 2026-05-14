@@ -53,7 +53,7 @@ export default function ProjectGate({ onProjectReady }) {
   return (
     <div className="gate-overlay">
       <div className="gate-card">
-        <div className="gate-logo">Visio</div>
+        <img src="/src/assets/logo.png" className="gate-logo-img" alt="Visio" />
 
         {screen === 'choose' && (
           <>

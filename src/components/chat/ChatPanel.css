@@ -267,3 +267,225 @@
   padding: 1px 5px;
   border-radius: 4px;
 }
+
+/* ── Workflow approval card ── */
+.approval-card {
+  align-self: flex-start;
+  max-width: 92%;
+  background: var(--bg-raised);
+  border: 0.5px solid var(--border-mid);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: card-in 0.2s ease both;
+}
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.approval-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.approval-icon {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: rgba(29,158,117,0.12);
+  color: var(--green-text);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.approval-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.approval-summary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.approval-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.approval-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  overflow: hidden;
+  transition: background 0.1s;
+}
+
+.approval-step.has-cmd .approval-step-header {
+  cursor: pointer;
+}
+
+.approval-step.has-cmd:hover { background: rgba(255,255,255,0.04); }
+.approval-step.open { background: rgba(255,255,255,0.05); }
+
+.approval-step-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 4px;
+  user-select: none;
+}
+
+.approval-step-num {
+  min-width: 16px; height: 16px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.approval-step-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.approval-chevron {
+  color: var(--text-hint);
+  flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+
+.approval-chevron.up { transform: rotate(180deg); }
+
+.approval-cmd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--amber-text);
+  background: rgba(0,0,0,0.25);
+  border-top: 0.5px solid rgba(255,255,255,0.06);
+  padding: 6px 8px 6px 27px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+  animation: cmd-in 0.15s ease both;
+}
+
+@keyframes cmd-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.approval-step-count {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-hint);
+  background: rgba(255,255,255,0.06);
+  padding: 1px 7px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.approval-step-more {
+  color: var(--text-muted);
+  font-size: 10px;
+  padding: 2px 4px 2px 27px;
+  font-style: italic;
+}
+
+.approval-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.approval-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.approval-btn:hover { opacity: 0.85; transform: scale(1.02); }
+.approval-btn:active { transform: scale(0.97); }
+
+.approval-btn.allow {
+  background: var(--green-text);
+  color: #fff;
+}
+
+.approval-btn.dismiss {
+  background: rgba(255,255,255,0.07);
+  color: var(--text-muted);
+  border: 0.5px solid var(--border-mid);
+}
+
+/* ── API key gate ── */
+.chat-gate {
+  flex-shrink: 0;
+  margin: 0 12px 8px;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.03);
+  border: 0.5px dashed var(--border-mid);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  animation: card-in 0.2s ease both;
+}
+
+.chat-gate-icon {
+  color: var(--amber-text);
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
+
+.chat-gate-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.chat-gate-body {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.chat-gate-body strong {
+  color: var(--text-secondary);
+}
+
+/* ── Blocked input state ── */
+.chat-input-blocked .chat-input-area {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.chat-input-blocked .input-hint {
+  opacity: 0.3;
+}
