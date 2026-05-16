@@ -8,6 +8,9 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('tools:install', toolId),
   scanToolsBlock: () =>
     ipcRenderer.invoke('agent:scanTools'),
+  bins: {
+    status: () => ipcRenderer.invoke('bins:status'),
+  },
 
   // File probing via ffprobe
   probeFiles: (filePaths) =>

@@ -1,9 +1,10 @@
 import { app, BrowserWindow, ipcMain, protocol, Menu, shell } from 'electron'
 import path from 'path'
 import fs from 'fs'
-import { spawn } from 'child_process'
+import { exec, spawn } from 'child_process'
+import { promisify } from 'util'
 import { fileURLToPath } from 'url'
-import { runFfmpeg, probeFiles, scanTools, formatToolsBlock, createLogger } from './ffmpeg.js'
+import { BIN, runFfmpeg, probeFiles, scanTools, formatToolsBlock, createLogger } from './ffmpeg.js'
 import {
   getAllProjects, createProject, setLastProject,
   getProjectMedia, getProjectOutputs, copyMediaToProject, deleteProjectMedia,
@@ -14,6 +15,7 @@ import { dialog } from 'electron'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DEV = process.env.NODE_ENV === 'development'
+const execAsync = promisify(exec)
 
 const MAX_RETRIES = 3
 const workflowControllers = new Map()
@@ -273,7 +275,15 @@ Menu.setApplicationMenu(null)
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280, height: 800, autoHideMenuBar: true,
+    title: 'Vizio',
     icon: path.join(__dirname, '../icon.png'),
+    backgroundColor: '#05070d',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#05070d',
+      symbolColor: '#e8f6ff',
+      height: 36,
+    },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true, nodeIntegration: false,
@@ -624,6 +634,27 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
 ipcMain.handle('agent:scanTools',   () => scanTools().then(formatToolsBlock))
 ipcMain.handle('agent:probeFiles',  (_, paths) => probeFiles(paths))
 ipcMain.handle('tools:scan',        () => scanTools()) // For MainPage UI status
+ipcMain.handle('bins:status', async () => {
+  const results = {}
+
+  for (const [name, binPath] of Object.entries(BIN)) {
+    const systemCommand = name === 'ytdlp' ? 'yt-dlp' : name
+    const bundled = binPath !== systemCommand
+    const flag = name === 'ytdlp' ? '--version' : '-version'
+    let version = null
+    let available = false
+
+    try {
+      const { stdout, stderr } = await execAsync(`"${binPath}" ${flag}`, { timeout: 5000 })
+      version = (stdout || stderr || '').split('\n')[0].trim().slice(0, 80)
+      available = true
+    } catch (_) {}
+
+    results[name] = { path: binPath, available, version, bundled }
+  }
+
+  return results
+})
 ipcMain.handle('tools:install', async (_, toolId) => {
   const installer = TOOL_INSTALLERS[toolId]
   if (!installer) return { ok: false, message: 'No installer is configured for this tool.' }

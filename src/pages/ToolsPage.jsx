@@ -66,6 +66,25 @@ const TOOLS = [
     },
   },
   {
+    id: 'ffplay',
+    scanNames: ['ffplay'],
+    icon: 'fp',
+    color: 'teal',
+    name: 'ffplay',
+    tagline: 'Media playback and quick preview from ffmpeg',
+    installed: true,
+    version: 'ships with ffmpeg',
+    caps: ['playback', 'preview', 'media QA'],
+    requires: ['ffmpeg package'],
+    setup: {
+      macOS:   [{ label: 'Ships with ffmpeg', cmd: 'brew install ffmpeg' }],
+      Windows: [{ label: 'Ships with ffmpeg', cmd: 'winget install ffmpeg' }],
+      Linux:   [{ label: 'Ships with ffmpeg', cmd: 'sudo apt install ffmpeg' }],
+      verify: 'ffplay -version',
+      docs: 'https://ffmpeg.org/ffplay.html',
+    },
+  },
+  {
     id: 'whisper',
     scanNames: ['whisper'],
     icon: 'wh',
@@ -150,10 +169,10 @@ const TOOLS = [
 
 const CATEGORIES = ['All', 'Installed', 'Not installed']
 
-export default function ToolsPage() {
+export default function ToolsPage({ initialTools, onRescan }) {
   const [filter, setFilter] = useState('All')
   const [expanded, setExpanded] = useState(null)
-  const [scannedTools, setScannedTools] = useState([])
+  const [scannedTools, setScannedTools] = useState(initialTools || [])
   const [isScanning, setIsScanning] = useState(false)
   const [installing, setInstalling] = useState(null)
   const [installLogs, setInstallLogs] = useState({})
@@ -161,8 +180,8 @@ export default function ToolsPage() {
   const scan = async () => {
     setIsScanning(true)
     try {
-      const results = await window.electron.scanTools()
-      setScannedTools(results)
+      if (onRescan) await onRescan()
+
     } catch (err) {
       console.error('Failed to scan tools:', err)
     } finally {
@@ -171,8 +190,8 @@ export default function ToolsPage() {
   }
 
   useEffect(() => {
-    scan()
-  }, [])
+    setScannedTools(initialTools || [])
+  }, [initialTools])
 
   // Merge static metadata with scan results
   const mergedTools = TOOLS.map(staticTool => {
@@ -181,7 +200,8 @@ export default function ToolsPage() {
     return {
       ...staticTool,
       installed: scanned ? scanned.available : false,
-      version: scanned ? scanned.version : staticTool.version
+      version: scanned ? scanned.version : staticTool.version,
+      bundled: scanned ? scanned.bundled : staticTool.bundled,
     }
   })
 
@@ -274,7 +294,7 @@ export default function ToolsPage() {
         <div className="tools-list">
           <div className="status-bar">
             <div className="status-dot" />
-            <span>ffmpeg + ffprobe ready — core editing is available this session</span>
+            <span>ffmpeg, ffprobe, ffplay and yt-dlp are checked for bundled/dev availability</span>
             <span className="status-right">last scanned just now</span>
           </div>
 
@@ -309,7 +329,7 @@ function ToolCard({ tool, isExpanded, onToggle, installing, installLog, onInstal
           <div className="tool-name">
             {tool.name}
             {tool.installed
-              ? <span className="tbadge ok">installed</span>
+              ? <span className="tbadge ok">{tool.bundled ? 'bundled' : 'installed'}</span>
               : tool.badge
               ? <span className="tbadge warn">{tool.badge}</span>
               : <span className="tbadge none">not installed</span>

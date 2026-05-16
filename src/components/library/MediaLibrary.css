@@ -70,7 +70,7 @@
 }
 
 .empty-library:hover .empty-icon {
-  background: rgba(29,158,117,0.07);
+  background: rgba(var(--accent-rgb),0.07);
   border-color: var(--green);
   color: var(--green-text);
 }
@@ -146,8 +146,8 @@
 
 /* Audio formats — greens / corals */
 .ext-mp3  { background: rgba(216,90,48,0.18);   color: var(--coral-text);  }
-.ext-wav  { background: rgba(29,158,117,0.18);  color: var(--green-text);  }
-.ext-flac { background: rgba(29,158,117,0.14);  color: var(--green-text);  }
+.ext-wav  { background: rgba(var(--accent-rgb),0.18);  color: var(--green-text);  }
+.ext-flac { background: rgba(var(--accent-rgb),0.14);  color: var(--green-text);  }
 .ext-aac  { background: rgba(239,159,39,0.15);  color: var(--amber-text);  }
 .ext-m4a  { background: rgba(216,90,48,0.14);   color: var(--coral-text);  }
 
@@ -252,7 +252,7 @@
 .add-more-btn:hover {
   border-color: var(--green);
   color: var(--green-text);
-  background: rgba(29,158,117,0.05);
+  background: rgba(var(--accent-rgb),0.05);
 }
 
 /* ── File info (probe) section ───────────────────────────────────────────────── */
@@ -308,7 +308,7 @@
 .drag-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(29,158,117,0.08);
+  background: rgba(var(--accent-rgb),0.08);
   border: 1.5px dashed var(--green);
   border-radius: 0;
   display: flex;
@@ -357,7 +357,7 @@
 
 .select-mode-btn.active {
   color: var(--green-text);
-  background: rgba(29,158,117,0.1);
+  background: rgba(var(--accent-rgb),0.1);
 }
 
 /* ── Select controls bar ─────────────────────────────────────────────────────── */
@@ -420,7 +420,7 @@
 
 .checkbox-box:hover {
   border-color: var(--green-border);
-  background: rgba(29,158,117,0.06);
+  background: rgba(var(--accent-rgb),0.06);
 }
 
 .checkbox-box.checked {
@@ -431,12 +431,12 @@
 
 /* ── Selected file row ───────────────────────────────────────────────────────── */
 .file-item.selected {
-  background: rgba(29,158,117,0.06);
-  border-color: rgba(29,158,117,0.15);
+  background: rgba(var(--accent-rgb),0.06);
+  border-color: rgba(var(--accent-rgb),0.15);
 }
 
 .file-item.selected:hover {
-  background: rgba(29,158,117,0.09);
+  background: rgba(var(--accent-rgb),0.09);
 }
 
 /* ── Selection action bar ────────────────────────────────────────────────────── */
@@ -468,9 +468,105 @@
 .select-send-btn:hover {
   filter: brightness(1.1);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(29,158,117,0.25);
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb),0.25);
 }
 
 .select-send-btn:active {
   transform: translateY(0);
+}
+
+/* ── Inline delete confirmation ──────────────────────────────────────────────── */
+.delete-confirm-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border-bottom: 0.5px solid rgba(239, 68, 68, 0.2);
+  flex-shrink: 0;
+  animation: fadeIn 0.12s ease;
+}
+
+.delete-confirm-text {
+  font-size: 11px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.delete-confirm-btn {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.delete-confirm-btn.yes {
+  background: #ef4444;
+  color: #fff;
+}
+
+.delete-confirm-btn.yes:hover {
+  background: #dc2626;
+}
+
+.delete-confirm-btn.no {
+  background: rgba(255,255,255,0.06);
+  color: var(--text-secondary);
+  border: 0.5px solid var(--border);
+}
+
+.delete-confirm-btn.no:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-primary);
+}
+
+.file-item.confirming {
+  background: rgba(239, 68, 68, 0.06);
+  border-color: rgba(239, 68, 68, 0.18);
+}
+
+/* ── Delete error bar ────────────────────────────────────────────────────────── */
+.delete-error-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(239, 68, 68, 0.06);
+  border-bottom: 0.5px solid rgba(239, 68, 68, 0.15);
+  flex-shrink: 0;
+  animation: fadeIn 0.12s ease;
+}
+
+.delete-error-text {
+  font-size: 10px;
+  color: #ef4444;
+}
+
+.delete-error-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.1s;
+}
+
+.delete-error-close:hover {
+  color: var(--text-primary);
 }

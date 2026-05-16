@@ -1,7 +1,7 @@
 {
-  "name": "vizio-NLP",
+  "name": "vizio",
   "version": "0.1.0",
-  "author": "Visio Team",
+  "author": "Vizio Team",
   "description": "AI-powered media agent desktop app for advanced video processing.",
   "main": "electron/main.js",
   "type": "module",
@@ -10,7 +10,8 @@
     "dev:web": "vite",
     "build": "vite build && electron-builder",
     "preview": "vite preview",
-    "codemap": "node codemap.js"
+    "codemap": "node codemap.js",
+    "test-bins": "node scripts/test-bins.js"
   },
   "dependencies": {
     "dotenv": "^16.0.0",
@@ -28,9 +29,9 @@
     "wait-on": "^7.0.0"
   },
   "build": {
-    "appId": "com.visio.media-agent",
-    "productName": "Visio Media Agent",
-    "copyright": "Copyright © 2024 Visio",
+    "appId": "com.vizio.app",
+    "productName": "Vizio",
+    "copyright": "Copyright © 2024 Vizio",
     "directories": {
       "output": "dist-electron"
     },
@@ -43,11 +44,42 @@
     "icon": "icon.png",
     "win": {
       "signAndEditExecutable": false,
+      "extraResources": [
+        {
+          "from": "resources/bin/win32",
+          "to": "bin",
+          "filter": [
+            "**"
+          ]
+        }
+      ],
       "target": [
         {
           "target": "nsis",
           "arch": [
             "x64"
+          ]
+        }
+      ]
+    },
+    "mac": {
+      "extraResources": [
+        {
+          "from": "resources/bin/darwin",
+          "to": "bin",
+          "filter": [
+            "**"
+          ]
+        }
+      ]
+    },
+    "linux": {
+      "extraResources": [
+        {
+          "from": "resources/bin/linux",
+          "to": "bin",
+          "filter": [
+            "**"
           ]
         }
       ]

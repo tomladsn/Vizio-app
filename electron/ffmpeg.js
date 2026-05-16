@@ -6,6 +6,46 @@ import { app }          from 'electron'
 
 const execAsync = promisify(exec)
 
+function resolveBin(name) {
+  const exe = process.platform === 'win32' ? `${name}.exe` : name
+
+  if (app.isPackaged) {
+    const packagedPath = path.join(process.resourcesPath, 'bin', exe)
+    if (fs.existsSync(packagedPath)) {
+      console.log(`[bin] ${name} -> bundled`)
+      return packagedPath
+    }
+  }
+
+  const devPath = path.join(process.cwd(), 'resources', 'bin', process.platform, exe)
+  if (fs.existsSync(devPath)) {
+    console.log(`[bin] ${name} -> dev local`)
+    return devPath
+  }
+
+  console.warn(`[bin] ${name} -> system PATH`)
+  return name
+}
+
+export const BIN = {
+  ffmpeg: resolveBin('ffmpeg'),
+  ffprobe: resolveBin('ffprobe'),
+  ffplay: resolveBin('ffplay'),
+  ytdlp: resolveBin('yt-dlp'),
+}
+
+console.log('[binaries]', BIN)
+
+function resolveCommandBin(bin) {
+  const cleanBin = bin.replace(/^["']|["']$/g, '')
+  const key = path.basename(cleanBin).toLowerCase().replace(/\.exe$/, '')
+  if (key === 'ffmpeg') return BIN.ffmpeg
+  if (key === 'ffprobe') return BIN.ffprobe
+  if (key === 'ffplay') return BIN.ffplay
+  if (key === 'yt-dlp') return BIN.ytdlp
+  return cleanBin
+}
+
 // Use Electron's userData path for logs — always predictable
 const LOG_DIR = path.join(app.getPath('userData'), 'logs')
 
@@ -32,7 +72,7 @@ export function runFfmpeg(command, { onProgress, durationSec, signal } = {}) {
   return new Promise((resolve) => {
     const cmd     = cleanCommand(command)
     const parts   = cmd.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? []
-    const bin     = parts[0]
+    const bin     = resolveCommandBin(parts[0])
     const args    = parts.slice(1).map(a => a.replace(/^["']|["']$/g, ''))
 
     const proc    = spawn(bin, args)
@@ -93,7 +133,7 @@ export function runFfmpeg(command, { onProgress, durationSec, signal } = {}) {
 export async function probeFiles(filePaths) {
   const results = []
   for (const file of filePaths) {
-    const cmd = `ffprobe -v quiet -print_format json -show_streams -show_format "${file}"`
+    const cmd = `"${BIN.ffprobe}" -v quiet -print_format json -show_streams -show_format "${file}"`
     try {
       const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 })
       const raw        = JSON.parse(stdout)
@@ -132,24 +172,27 @@ export async function probeFiles(filePaths) {
 }
 
 // ─── Scan installed tools ─────────────────────────────────────────────────────
-const KNOWN_TOOLS = [
-  { name: 'ffmpeg',   check: 'ffmpeg -version',    category: 'Media',    description: 'Video/audio encoding, filtering, trimming, muxing' },
-  { name: 'ffprobe',  check: 'ffprobe -version',   category: 'Media',    description: 'Media file inspection and stream analysis'          },
-  { name: 'whisper',  check: 'whisper --version',  category: 'AI / ML',  description: 'Speech-to-text transcription (OpenAI Whisper)',   fallback: 'python -m whisper --version' },
-  { name: 'yt-dlp',   check: 'yt-dlp --version',   category: 'Download', description: 'Download video/audio from 1000+ sites'             },
+export const KNOWN_TOOLS = [
+  { name: 'ffmpeg',  check: BIN.ffmpeg,  flag: '-version',  category: 'Media',    description: 'Video/audio encoding, filtering, trimming, muxing', bundled: true },
+  { name: 'ffprobe', check: BIN.ffprobe, flag: '-version',  category: 'Media',    description: 'Media file inspection and stream analysis', bundled: true },
+  { name: 'ffplay',  check: BIN.ffplay,  flag: '-version',  category: 'Media',    description: 'Media playback and preview', bundled: true },
+  { name: 'yt-dlp',  check: BIN.ytdlp,   flag: '--version', category: 'Download', description: 'Download video/audio from 1000+ sites', bundled: true },
+  { name: 'whisper', check: 'whisper',   flag: '--version', category: 'AI / ML',  description: 'Speech-to-text transcription (OpenAI Whisper)', fallback: 'python -m whisper --version', bundled: false },
   {
     name: 'magick',
-    check: 'magick --version',
+    check: 'magick',
+    flag: '--version',
     category: 'Image',
     description: 'Frame-level image manipulation (ImageMagick)',
     fallback: 'magick.exe --version',
+    bundled: false,
     windowsSearch: {
       baseDirs: ['ProgramFiles', 'ProgramFiles(x86)', 'LOCALAPPDATA'],
       subdirs: ['ImageMagick-*', 'ImageMagick'],
       exe: 'magick.exe',
     },
   },
-  { name: 'python',   check: 'python --version',   category: 'System',   description: 'Python runtime (needed for AI tools like whisper)'  },
+  { name: 'python', check: 'python', flag: '--version', category: 'System', description: 'Python runtime (needed for AI tools like whisper)', bundled: false },
 ]
 
 function matchWindowsDirs(baseDir, patterns) {
@@ -183,7 +226,7 @@ export async function scanTools() {
     }
 
     // 1. Try primary check
-    let res = await tryCommand(tool.check)
+    let res = await tryCommand(`"${tool.check}" ${tool.flag}`)
     if (res.success) return { ...tool, available: true, version: res.version }
 
     // 2. Try fallback if defined

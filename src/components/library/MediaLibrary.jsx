@@ -13,6 +13,8 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
   const [copying,   setCopying]   = useState(false)
   const [selected,  setSelected]  = useState(new Set())
   const [selectMode, setSelectMode] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(null)
+  const [deleteError, setDeleteError] = useState(null)
   const dropRef = useRef(null)
 
   // Load project media on mount and when project changes
@@ -69,13 +71,23 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
     input.click()
   }
 
-  async function handleDelete(file) {
-    const ok = window.confirm(`Delete "${file.name}" from this project?`)
-    if (!ok) return
+  function handleDeleteRequest(file) {
+    setDeleteError(null)
+    setConfirmingDelete(file)
+  }
+
+  function handleDeleteCancel() {
+    setConfirmingDelete(null)
+  }
+
+  async function handleDeleteConfirm() {
+    const file = confirmingDelete
+    if (!file) return
+    setConfirmingDelete(null)
 
     const result = await window.electron.project.deleteMedia(file.path, project.folderPath)
     if (!result?.ok) {
-      window.alert(result?.message || 'Could not delete this file.')
+      setDeleteError(result?.message || 'Could not delete this file.')
       return
     }
     if (activeFile?.path === file.path) onDeleteFile?.(file)
@@ -155,6 +167,23 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
         </div>
       )}
 
+      {confirmingDelete && (
+        <div className="delete-confirm-bar">
+          <span className="delete-confirm-text">Delete "{confirmingDelete.name}"?</span>
+          <div className="delete-confirm-actions">
+            <button className="delete-confirm-btn yes" onClick={handleDeleteConfirm}>Delete</button>
+            <button className="delete-confirm-btn no" onClick={handleDeleteCancel}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {deleteError && (
+        <div className="delete-error-bar">
+          <span className="delete-error-text">{deleteError}</span>
+          <button className="delete-error-close" onClick={() => setDeleteError(null)}>×</button>
+        </div>
+      )}
+
       {files.length === 0 ? (
         <div className="empty-library" onClick={handleAddMore}>
           <div className="empty-icon">⬇</div>
@@ -168,6 +197,7 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
               key={file.path}
               file={file}
               active={activeFile?.path === file.path}
+              isConfirming={confirmingDelete?.path === file.path}
               selectMode={selectMode}
               isSelected={selected.has(file.path)}
               onToggleSelect={() => {
@@ -176,7 +206,7 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
               }}
               onSelect={() => onSelectFile(file)}
               onMention={() => onMentionFile?.(file.name)}
-              onDelete={() => handleDelete(file)}
+              onDelete={() => handleDeleteRequest(file)}
             />
           ))}
         </div>
@@ -215,10 +245,10 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
   )
 }
 
-function FileRow({ file, active, selectMode, isSelected, onToggleSelect, onSelect, onMention, onDelete }) {
+function FileRow({ file, active, isConfirming, selectMode, isSelected, onToggleSelect, onSelect, onMention, onDelete }) {
   return (
     <div
-      className={`file-item ${active ? 'active' : ''} ${isSelected ? 'selected' : ''}`}
+      className={`file-item ${active ? 'active' : ''} ${isSelected ? 'selected' : ''} ${isConfirming ? 'confirming' : ''}`}
       onClick={selectMode ? onToggleSelect : onSelect}
     >
       {selectMode && (

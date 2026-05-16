@@ -55,7 +55,7 @@ export default function MenuBar({ activePage, onNavigate, canGoBack, canGoForwar
         ))}
       </nav>
 
-      <span className="menubar-title">Visio Media Agent</span>
+      <span className="menubar-title">Vizio</span>
     </div>
   )
 }

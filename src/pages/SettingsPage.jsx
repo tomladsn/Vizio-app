@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { settingsStore, PROVIDERS, ACCENTS, THEMES, MODEL_HINTS, MODEL_PRESETS } from '../store/settingsStore'
+import { settingsStore, PROVIDERS, ACCENTS, THEMES, FONT_PRESETS, MODEL_HINTS, MODEL_PRESETS } from '../store/settingsStore'
 import './SettingsPage.css'
 
 export default function SettingsPage() {
@@ -263,6 +263,20 @@ function ProviderConfig({ provider, settings, shown, onToggleShow, onUpdate }) {
             <div className="field-help">Caps response size to help control latency and cost.</div>
           </div>
         </div>
+
+        <div className="advanced-grid" style={{ marginTop: '16px' }}>
+          <div className="advanced-field" style={{ gridColumn: '1 / -1' }}>
+            <label className="field-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={settings.autoApproveWorkflows || false}
+                onChange={e => onUpdate('autoApproveWorkflows', e.target.checked)}
+              />
+              Auto-approve workflows (don't ask for permission)
+            </label>
+            <div className="field-help" style={{ marginLeft: '22px' }}>When enabled, the AI will immediately execute its planned tasks.</div>
+          </div>
+        </div>
       </section>
     </>
   )
@@ -318,6 +332,42 @@ function AppearanceTab({ settings, onUpdate }) {
               <div className="accent-label">{a.label}</div>
             </button>
           ))}
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="section-title">Font style</div>
+        <p className="section-desc">Choose the reading feel for labels, panels and controls.</p>
+        <div className="font-grid">
+          {FONT_PRESETS.map(font => (
+            <button
+              key={font.id}
+              className={`font-card ${settings.fontPreset === font.id ? 'active' : ''}`}
+              style={{ fontFamily: font.stack }}
+              onClick={() => onUpdate('fontPreset', font.id)}
+            >
+              <span className="font-card-label">{font.label}</span>
+              <span className="font-card-sample">{font.sample}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="section-title">Font size</div>
+        <p className="section-desc">Adjust the base font size for the application.</p>
+        <div className="advanced-grid" style={{ maxWidth: '200px' }}>
+          <div className="advanced-field">
+            <input
+              type="number"
+              min="10"
+              max="24"
+              step="1"
+              className="key-input"
+              value={settings.fontSize || 13}
+              onChange={e => onUpdate('fontSize', Number(e.target.value))}
+            />
+          </div>
         </div>
       </section>
     </>

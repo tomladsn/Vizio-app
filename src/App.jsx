@@ -20,12 +20,33 @@ export default function App() {
   const [activeChatId, setActiveChatId] = useState(null)
 
   const [settings, setSettings] = useState(settingsStore.get())
+  const [appLoading, setAppLoading] = useState(true)
+  const [scannedTools, setScannedTools] = useState([])
+  const [toolsBlock, setToolsBlock] = useState('')
 
   // ── Global drag-and-drop ─────────────────────────────────────────────────
   const [globalDragging, setGlobalDragging] = useState(false)
   const [globalDropping, setGlobalDropping] = useState(false)
   const dragCounter   = useRef(0)
   const libraryReloadRef = useRef(null)   // set by MainPage
+
+  useEffect(() => {
+    async function initialScan() {
+      try {
+        const [block, tools] = await Promise.all([
+          window.electron.scanToolsBlock(),
+          window.electron.scanTools()
+        ])
+        setToolsBlock(block)
+        setScannedTools(tools)
+      } catch (e) {
+        console.error('Scan failed', e)
+      } finally {
+        setAppLoading(false)
+      }
+    }
+    initialScan()
+  }, [])
 
   useEffect(() => {
     function onDragEnter(e) {
@@ -78,8 +99,10 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = settings.themeBase || 'dark'
-    document.documentElement.dataset.accent = settings.themeAccent || 'green'
-  }, [settings.themeBase, settings.themeAccent])
+    document.documentElement.dataset.accent = settings.themeAccent || 'vizio'
+    document.documentElement.dataset.font = settings.fontPreset || 'inter'
+    document.documentElement.style.fontSize = (settings.fontSize || 13) + 'px'
+  }, [settings.themeBase, settings.themeAccent, settings.fontPreset, settings.fontSize])
 
   function navigate(to) {
     if (to === page) return
@@ -102,6 +125,19 @@ export default function App() {
   }
 
   // Show gate until a project is selected/created
+  if (appLoading) {
+    return (
+      <div className="gate-overlay">
+        <div className="gate-card" style={{ alignItems: 'center', justifyContent: 'center', padding: '60px' }}>
+          <img src="/src/assets/logo.png" className="gate-logo-img" alt="Vizio" style={{ width: 80, height: 80, marginBottom: 20 }} />
+          <div className="gate-title">Starting Vizio...</div>
+          <div className="gate-subtitle">Scanning system for media tools</div>
+          <div className="gate-spinner" style={{ marginTop: 20 }} />
+        </div>
+      </div>
+    )
+  }
+
   if (!project) return <ProjectGate onProjectReady={setProject} />
 
   return (
@@ -153,10 +189,21 @@ export default function App() {
             activeChatId={activeChatId}
             onChatChange={setActiveChatId}
             onRegisterLibraryReload={fn => { libraryReloadRef.current = fn }}
+            toolsBlock={toolsBlock}
           />
         </div>
         <div style={{ display: page === 'tools' ? 'contents' : 'none' }}>
-          <ToolsPage />
+          <ToolsPage 
+            initialTools={scannedTools}
+            onRescan={async () => {
+              const [block, tools] = await Promise.all([
+                window.electron.scanToolsBlock(),
+                window.electron.scanTools()
+              ])
+              setToolsBlock(block)
+              setScannedTools(tools)
+            }}
+          />
         </div>
         <div style={{ display: page === 'settings' ? 'contents' : 'none' }}>
           <SettingsPage />

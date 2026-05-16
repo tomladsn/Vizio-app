@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="icon.png" alt="Visio Media Agent" width="100" />
+<img src="icon.png" alt="Vizio" width="100" />
 
 # Vizio
 
@@ -18,9 +18,9 @@
 
 ## ✨ Overview
 
-**Vizio** is a desktop application that turns natural language instructions into fully automated media-processing workflows. Describe what you want in plain English — *"compress this video to under 50 MB"*, *"transcribe and subtitle all these clips"*, *"extract the audio and normalize the volume"* — and the AI agent generates, executes, and self-corrects an ffmpeg/tool pipeline without you needing to touch the command line.
+**Vizio** is an AI-powered media workspace that transforms natural language instructions into complex, automated workflows. By bridging the gap between human intent and technical toolchains, Vizio enables anyone to perform advanced media operations—like batch compression, AI transcription, or programmatic image editing—without writing a single line of code.
 
-Under the hood it uses **Groq**, **Anthropic (Claude)**, **OpenAI**, or a **local Ollama** model as the reasoning engine, and delegates the heavy lifting to battle-tested media tools like `ffmpeg`, `whisper`, `yt-dlp`, and `ImageMagick`.
+The application acts as an intelligent orchestrator, leveraging large language models (LLMs) to plan and execute multi-step pipelines using a suite of professional media tools including `ffmpeg`, `whisper`, `yt-dlp`, `ImageMagick`, and more.
 
 ---
 
@@ -56,48 +56,37 @@ Configure your AI provider (Groq, Anthropic, OpenAI, Ollama), paste API keys, ch
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture & Capabilities
 
-```
-Vizio-app/
-├── electron/                  # Electron main process
-│   ├── main.js                # IPC handlers, AI calls, workflow engine
-│   ├── ffmpeg.js              # ffmpeg/ffprobe runner, tool scanner, session logger
-│   ├── preload.js             # Context bridge (renderer ↔ main)
-│   └── projectStore.js        # Project, chat, and file-system management
-│
-├── src/                       # React renderer process
-│   ├── App.jsx                # Root: routing, global drag-and-drop, theme
-│   ├── components/
-│   │   ├── chat/              # ChatPanel (message list, input, multi-file select)
-│   │   ├── layout/            # MenuBar, ExecutionBar
-│   │   ├── library/           # MediaLibrary (file browser & selector)
-│   │   ├── preview/           # PreviewPanel (video/audio/image viewer)
-│   │   └── project/           # ProjectGate (create / open project)
-│   ├── pages/
-│   │   ├── MainPage.jsx       # Three-panel workspace layout
-│   │   ├── ToolsPage.jsx      # Tool status, install, docs
-│   │   └── SettingsPage.jsx   # AI provider config & appearance
-│   └── store/
-│       └── settingsStore.js   # Persistent settings (provider, model, theme)
-│
-├── index.html
-├── vite.config.js
-└── package.json
-```
+Vizio is built on a robust, tool-agnostic architecture designed for extensibility and reliability. The "Base Build" provides a powerful core that manages the entire lifecycle of a media task.
+
+### 🧠 Agentic Workflow Engine
+The heart of the application is a sophisticated orchestration layer that translates vague user requests into deterministic JSON-based workflows. This engine doesn't just run commands; it understands dependencies, manages file states, and maintains a persistent memory of the project environment.
+
+### 🛠️ Multi-Tool Integration Layer
+While many tools are supported, the architecture treats each as a swappable plugin. Whether it's `ffmpeg` for encoding, `yt-dlp` for ingestion, or `whisper` for intelligence, Vizio provides a unified interface for tool detection, configuration, and execution.
+
+### 🩺 Self-Healing Execution Loop
+Execution is never "fire and forget." The base build includes a recursive validation loop. If a tool exits with an error, the AI analyzes the logs, identifies the root cause (e.g., a missing codec or a syntax error), and automatically re-plans the step—correcting itself in real-time.
+
+### 📂 Integrated Workspace Manager
+The architecture revolves around a "Project-First" philosophy. Each project is a self-contained ecosystem with its own:
+- **Media Library**: Tracks inputs, derivatives, and final outputs.
+- **Session History**: Deep-linkable logs of every AI decision and tool output.
+- **Contextual State**: Metadata and file structures are indexed and fed back into the AI to ensure high-precision workflow generation.
 
 ---
 
 ## ⚙️ How It Works
 
 ```
-User types a goal  →  Agent reads media metadata (ffprobe)
+User types a goal  →  Agent analyzes project state & media metadata
                    →  AI generates a multi-step JSON workflow
-                   →  Each step runs as an ffmpeg / shell command
-                   →  Exit 0 → next step
-                   →  Non-zero → AI diagnoses & retries (max 3×)
+                   →  Each step runs as a tool-specific shell command
+                   →  Exit 0 → Proceed to next step
+                   →  Error  → AI diagnoses, fixes, and retries (max 3×)
                    →  Outputs saved to project/output/
-                   →  Results shown in the Preview panel
+                   →  Results updated in Media Library & Preview
 ```
 
 The AI never writes brittle one-liners — it produces a structured workflow object with individually trackable steps, real-time progress, and a full session log.

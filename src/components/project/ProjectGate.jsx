@@ -53,7 +53,7 @@ export default function ProjectGate({ onProjectReady }) {
   return (
     <div className="gate-overlay">
       <div className="gate-card">
-        <img src="/src/assets/logo.png" className="gate-logo-img" alt="Visio" />
+        <img src="/src/assets/logo.png" className="gate-logo-img" alt="Vizio" />
 
         {screen === 'choose' && (
           <>
@@ -63,7 +63,9 @@ export default function ProjectGate({ onProjectReady }) {
             <div className="gate-projects">
               {projects.map(p => (
                 <button key={p.id} className="gate-project-row" onClick={() => handleOpen(p)}>
-                  <div className="gpr-icon">V</div>
+                  <div className="gpr-icon">
+                    <img src="/src/assets/logo.png" alt="" />
+                  </div>
                   <div className="gpr-info">
                     <div className="gpr-name">{p.name}</div>
                     <div className="gpr-path">{p.folderPath}</div>

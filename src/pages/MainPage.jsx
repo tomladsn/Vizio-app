@@ -5,10 +5,9 @@ import PreviewPanel from '../components/preview/PreviewPanel'
 import ExecutionBar from '../components/layout/ExecutionBar'
 import './MainPage.css'
 
-export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSessionId, activeChatId, onChatChange, onRegisterLibraryReload }) {
+export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSessionId, activeChatId, onChatChange, onRegisterLibraryReload, toolsBlock }) {
   const [activeFile, setActiveFile] = useState(null)
   const [probeData, setProbeData] = useState(null)
-  const [toolsBlock, setToolsBlock] = useState(null)
   const [projectFiles, setProjectFiles] = useState([])
   const [outputFiles, setOutputFiles]   = useState([])
   const [reloadTrigger, setReloadTrigger] = useState(0)
@@ -27,10 +26,6 @@ export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSe
   const [showChats, setShowChats] = useState(false)
   const [pendingWorkflow, setPendingWorkflow] = useState(null)
   const mentionFnRef = useRef(null)
-
-  useEffect(() => {
-    window.electron.scanToolsBlock().then(setToolsBlock)
-  }, [])
 
   useEffect(() => {
     if (!project) return

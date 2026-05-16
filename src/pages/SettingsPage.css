@@ -9,8 +9,9 @@
 /* ── Toolbar ────────────────────────────────────────────────────────────────── */
 .settings-toolbar {
   height: 40px;
-  background: var(--bg-overlay);
+  background: var(--toolbar-bg);
   border-bottom: 0.5px solid var(--border);
+  box-shadow: var(--chrome-shadow);
   display: flex;
   align-items: center;
   padding: 0 16px;
@@ -37,7 +38,7 @@
 }
 
 .save-btn:hover    { opacity: 0.85; }
-.save-btn.saved    { background: rgba(29,158,117,0.3); color: var(--green-text); }
+.save-btn.saved    { background: rgba(var(--accent-rgb),0.3); color: var(--green-text); }
 
 /* ── Body ───────────────────────────────────────────────────────────────────── */
 .settings-body {
@@ -148,7 +149,7 @@
 
 .provider-tab.active {
   border-color: var(--green);
-  background: rgba(29,158,117,0.05);
+  background: rgba(var(--accent-rgb),0.05);
 }
 
 .ptab-label {
@@ -214,7 +215,7 @@
 
 .key-input:focus {
   border-color: var(--green);
-  box-shadow: 0 0 0 2px rgba(29,158,117,0.12);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb),0.12);
 }
 
 .reveal-btn {
@@ -274,7 +275,7 @@
 }
 
 .model-card:hover  { border-color: var(--border-mid); background: rgba(255,255,255,0.03); }
-.model-card.active { border-color: var(--green); background: rgba(29,158,117,0.05); }
+.model-card.active { border-color: var(--green); background: rgba(var(--accent-rgb),0.05); }
 
 .model-radio {
   width: 16px;
@@ -373,8 +374,8 @@
 
 .preset-card.active {
   border-color: var(--green);
-  background: linear-gradient(180deg, rgba(29,158,117,0.16), rgba(29,158,117,0.06));
-  box-shadow: 0 0 0 1px rgba(29,158,117,0.15);
+  background: linear-gradient(180deg, rgba(var(--accent-rgb),0.16), rgba(var(--accent-rgb),0.06));
+  box-shadow: 0 0 0 1px rgba(var(--accent-rgb),0.15);
 }
 
 .preset-name {
@@ -432,7 +433,7 @@
 /* ── Theme picker ───────────────────────────────────────────────────────────── */
 .theme-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px;
 }
 
@@ -451,7 +452,7 @@
 }
 
 .theme-card:hover  { border-color: var(--border-mid); }
-.theme-card.active { border-color: var(--green); background: rgba(29,158,117,0.05); }
+.theme-card.active { border-color: var(--green); background: rgba(var(--accent-rgb),0.05); }
 
 /* Mini preview swatch */
 .theme-preview {
@@ -464,9 +465,12 @@
   border: 0.5px solid rgba(255,255,255,0.06);
 }
 
-.theme-preview.dark   { background: #111111; }
-.theme-preview.darker { background: #090909; }
-.theme-preview.dim    { background: #1a1a22; }
+.theme-preview.dark   { background: linear-gradient(135deg, #05070d, #122638); }
+.theme-preview.darker { background: linear-gradient(135deg, #000, #0b1b2a); }
+.theme-preview.dim    { background: linear-gradient(135deg, #10141c, #22334a); }
+.theme-preview.frost  { background: linear-gradient(135deg, #edf6fb, #d9ecfb); }
+.theme-preview.pearl  { background: linear-gradient(135deg, #f4f1ed, #e9edf2); }
+.theme-preview.day    { background: linear-gradient(135deg, #ffffff, #eef3f8); }
 
 .tp-bar {
   height: 10px;
@@ -492,7 +496,7 @@
 .tp-line.long  { width: 70%; }
 .tp-line.short { width: 45%; }
 
-.theme-card.active .tp-line { background: rgba(29,158,117,0.5); }
+.theme-card.active .tp-line { background: rgba(var(--accent-rgb),0.5); }
 
 .theme-label {
   font-size: 12px;
@@ -547,7 +551,7 @@
 }
 
 .accent-card:hover { border-color: var(--border-mid); }
-.accent-card.active { border-color: var(--green); background: rgba(29,158,117,0.05); }
+.accent-card.active { border-color: var(--green); background: rgba(var(--accent-rgb),0.05); }
 
 .accent-swatch {
   width: 20px;
@@ -571,4 +575,47 @@
   font-size: 11px;
   font-weight: 500;
   color: var(--text-primary);
+}
+
+.font-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.font-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 74px;
+  padding: 12px;
+  background: var(--bg-overlay);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-primary);
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+}
+
+.font-card:hover {
+  border-color: var(--border-mid);
+  transform: translateY(-1px);
+}
+
+.font-card.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.font-card-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.font-card-sample {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.35;
 }

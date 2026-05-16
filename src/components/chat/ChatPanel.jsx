@@ -51,7 +51,7 @@ function buildProjectStateBlock(projectFiles = [], outputFiles = [], projectDir 
 }
 
 function buildSystemPrompt(toolsBlock, fileBlock, projectStateBlock, outputDir, workflowBlock = '') {
-  return `You are Visio, a desktop media processing AGENT with direct control over the project folder.
+  return `You are Vizio, a desktop media processing AGENT with direct control over the project folder.
 You are not a chatbot -- you are an autonomous agent that can read, write, rename, move and delete files inside the project.
 
 ${toolsBlock}
@@ -278,7 +278,7 @@ function normalizeAIResponse(parsed) {
     if (workflow) return normalizeAIResponse(workflow)
 
     const textItem = parsed.find(item => (
-      item && typeof item === 'object' && (item.mode === 'chat' || item.type === 'text' || item.type === 'chat')
+      item && typeof item === 'object' && (item.mode === 'chat' || item.type === 'text' || item.type === 'chat' || typeof item.message === 'string' || typeof item.text === 'string')
     ))
     if (textItem) return normalizeAIResponse(textItem)
 
@@ -298,6 +298,10 @@ function normalizeAIResponse(parsed) {
   if (!parsed.mode) {
     if (Array.isArray(parsed.steps)) parsed.mode = 'workflow'
     else if (typeof parsed.message === 'string') parsed.mode = 'chat'
+    else if (typeof parsed.text === 'string') {
+      parsed.mode = 'chat'
+      parsed.message = parsed.text
+    }
   }
 
   if (parsed.mode === 'workflow') {
@@ -813,6 +817,20 @@ export default function ChatPanel({
   }
 
   async function queueWorkflowForConfirmation(workflow, sid) {
+    await window.electron.prepareWorkflow({
+      workflow,
+      sessionId: sid,
+      projectDir: project.folderPath,
+      userGoal: lastInputRef.current,
+      mediaFiles: getRequestedFiles(lastInputRef.current, projectFiles, attachedFiles).map(file => file.path),
+    })
+
+    const currentSettings = settingsStore.get()
+    if (currentSettings.autoApproveWorkflows) {
+      startWorkflowExecution(workflow, sid)
+      return
+    }
+
     pendingWorkflowRef.current = workflow
     pendingSessionIdRef.current = sid
     workflowStateRef.current = {
@@ -822,13 +840,6 @@ export default function ChatPanel({
     onSessionId?.(sid)
     // Expose the pending steps to the ExecutionBar session panel
     onPendingWorkflow?.(workflow)
-    await window.electron.prepareWorkflow({
-      workflow,
-      sessionId: sid,
-      projectDir: project.folderPath,
-      userGoal: lastInputRef.current,
-      mediaFiles: getRequestedFiles(lastInputRef.current, projectFiles, attachedFiles).map(file => file.path),
-    })
     // Show inline approval card instead of a text prompt
     setMessages(prev => {
       const card = { id: Date.now() + 2, role: 'ai', type: 'approval', workflow }
@@ -1074,9 +1085,13 @@ export default function ChatPanel({
       }
 
       if (!parsed) {
-        addAiMessage('I could not turn the model response into a runnable plan. Try again, or select the files and use a simpler command like `convert to webp`.', true)
-        setLoading(false)
-        return
+        if (responseForHistory.trim()) {
+          parsed = { mode: 'chat', message: responseForHistory.trim() }
+        } else {
+          addAiMessage('I could not turn the model response into a runnable plan. Try again, or select the files and use a simpler command like `convert to webp`.', true)
+          setLoading(false)
+          return
+        }
       }
 
       pushAssistantHistory(historyRef, responseForHistory)
