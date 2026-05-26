@@ -1,9 +1,10 @@
 import React from 'react'
 import './MenuBar.css'
+import logo from '../../assets/logo.png'
 
 export default function MenuBar({ activePage, onNavigate, canGoBack, canGoForward, onBack, onForward, projectName, onChangeProject }) {
   const items = [
-    { label: 'Edit', value: 'main' },
+    { label: 'Workspace', value: 'main' },
     { label: 'Tools', value: 'tools' },
     { label: 'Settings', value: 'settings' },
   ]
@@ -36,7 +37,7 @@ export default function MenuBar({ activePage, onNavigate, canGoBack, canGoForwar
 
         {projectName && (
           <div className="menubar-project" onClick={onChangeProject} title="Switch project">
-            <img src="/src/assets/logo.png" className="project-icon-img" alt="V" />
+            <img src={logo} className="project-icon-img" alt="V" />
             <span className="project-name">{projectName}</span>
             <span className="project-switch">↓</span>
           </div>

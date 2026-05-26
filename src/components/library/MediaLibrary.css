@@ -150,6 +150,17 @@
 .ext-flac { background: rgba(var(--accent-rgb),0.14);  color: var(--green-text);  }
 .ext-aac  { background: rgba(239,159,39,0.15);  color: var(--amber-text);  }
 .ext-m4a  { background: rgba(216,90,48,0.14);   color: var(--coral-text);  }
+.ext-ogg  { background: rgba(239,159,39,0.15);  color: var(--amber-text);  }
+.ext-opus { background: rgba(239,159,39,0.14);  color: var(--amber-text);  }
+.ext-wma  { background: rgba(216,90,48,0.12);   color: var(--coral-text);  }
+
+/* Subtitle and text files */
+.ext-srt,
+.ext-vtt,
+.ext-ass,
+.ext-ssa { background: rgba(127,119,221,0.14); color: var(--purple-text); }
+.ext-txt,
+.ext-md { background: rgba(75,184,255,0.12); color: var(--blue-text); }
 
 /* Fallback */
 .file-thumb:not([class*="ext-"]) {

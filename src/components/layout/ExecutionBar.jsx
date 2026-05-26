@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { settingsStore } from '../../store/settingsStore'
+import { useSecureKeys } from '../../hooks/useSecureKeys'
 import './ExecutionBar.css'
 
 export default function ExecutionBar({ tasks = [], pendingWorkflow = null }) {
   const [config, setConfig] = useState(settingsStore.getActiveConfig())
+  const { isProviderReady } = useSecureKeys()
   const pendingSteps = pendingWorkflow?.steps ?? []
 
   useEffect(() => {
@@ -12,7 +14,7 @@ export default function ExecutionBar({ tasks = [], pendingWorkflow = null }) {
     })
   }, [])
 
-  const hasKey = config.isLocal || !!config.apiKey?.trim()
+  const hasKey = config.isLocal || isProviderReady(config.providerId)
   const hasModel = !!config.model?.trim()
 
   return (

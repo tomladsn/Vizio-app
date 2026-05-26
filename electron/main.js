@@ -4,14 +4,104 @@ import fs from 'fs'
 import { exec, spawn } from 'child_process'
 import { promisify } from 'util'
 import { fileURLToPath } from 'url'
-import { BIN, runFfmpeg, probeFiles, scanTools, formatToolsBlock, createLogger } from './ffmpeg.js'
+import { BIN, runFfmpeg, probeFiles, scanTools, scanToolsWithBlock, formatToolsBlock, createLogger } from './ffmpeg.js'
 import {
-  getAllProjects, createProject, setLastProject,
+  getAllProjects, createProject, setLastProject, deleteProject,
   getProjectMedia, getProjectOutputs, copyMediaToProject, deleteProjectMedia,
   listChats, loadChat, saveChat, createChat, deleteChat,
   listProjectDir, renameProjectFile, moveProjectFile, readProjectText, writeProjectText,
 } from './projectStore.js'
 import { dialog } from 'electron'
+import {
+  setEncryptedKey, deleteEncryptedKey, listEncryptedKeyIds,
+  getKeyHint, getDecryptedKey, migrateLegacyKeys, hasEncryptedKey, isEncryptionAvailable,
+} from './keyStore.js'
+import { callAI, streamAI, buildAIConfig } from './aiClient.js'
+
+// ── Secure key store (OS credential manager via safeStorage) ──────────────────
+ipcMain.handle('keys:set', (_, { keyId, value }) => {
+  try {
+    if (!isEncryptionAvailable()) {
+      return { ok: false, message: 'OS encryption is not available on this machine.' }
+    }
+    return setEncryptedKey(keyId, value)
+  } catch (err) {
+    return { ok: false, message: err.message }
+  }
+})
+
+ipcMain.handle('keys:getHint', (_, keyId) => getKeyHint(keyId))
+ipcMain.handle('keys:has', (_, keyId) => hasEncryptedKey(keyId))
+ipcMain.handle('keys:listSet', () => listEncryptedKeyIds())
+ipcMain.handle('keys:delete', (_, keyId) => {
+  try {
+    return deleteEncryptedKey(keyId)
+  } catch (err) {
+    return { ok: false, message: err.message }
+  }
+})
+
+ipcMain.handle('keys:migrate', (_, legacyKeys) => {
+  try {
+    return migrateLegacyKeys(legacyKeys ?? {})
+  } catch (err) {
+    return { ok: false, message: err.message, migrated: [], skipped: [] }
+  }
+})
+
+const aiStreamControllers = new Map()
+
+function resolveAIConfig({ providerId, baseUrl, model, maxTokens, temperature }) {
+  const apiKey = providerId === 'ollama' ? '' : getDecryptedKey(`${providerId}ApiKey`)
+  return buildAIConfig({ providerId, baseUrl, model, maxTokens, temperature, apiKey })
+}
+
+ipcMain.handle('ai:complete', async (_, payload) => {
+  try {
+    const config = resolveAIConfig(payload)
+    const text = await callAI(payload.messages, config, { retries: payload.retries ?? 2, signal: null })
+    return { ok: true, text }
+  } catch (err) {
+    return { ok: false, message: err.message, status: err.status ?? 0, cancelled: !!err.cancelled }
+  }
+})
+
+ipcMain.handle('ai:streamStart', async (event, payload) => {
+  const { requestId, messages } = payload
+  const channel = `ai:stream:${requestId}`
+  const controller = new AbortController()
+  aiStreamControllers.set(requestId, controller)
+
+  const config = resolveAIConfig(payload)
+
+  streamAI(messages, config, {
+    signal: controller.signal,
+    onDelta: (delta) => {
+      if (!event.sender.isDestroyed()) event.sender.send(channel, { delta })
+    },
+  })
+    .then((fullText) => {
+      if (!event.sender.isDestroyed()) event.sender.send(channel, { done: true, fullText })
+    })
+    .catch((err) => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(channel, {
+          error: err.message || 'Stream failed',
+          status: err.status ?? 0,
+          cancelled: !!err.cancelled,
+        })
+      }
+    })
+    .finally(() => aiStreamControllers.delete(requestId))
+
+  return { ok: true }
+})
+
+ipcMain.handle('ai:streamAbort', (_, requestId) => {
+  aiStreamControllers.get(requestId)?.abort()
+  aiStreamControllers.delete(requestId)
+  return { ok: true }
+})
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DEV = process.env.NODE_ENV === 'development'
@@ -40,10 +130,6 @@ const TOOL_INSTALLERS = {
   imagemagick: {
     command: 'winget install --id ImageMagick.ImageMagick -e --accept-source-agreements --accept-package-agreements',
     note: 'Installs ImageMagick magick.exe.',
-  },
-  pyannote: {
-    command: 'python -m pip install -U pyannote.audio',
-    note: 'Requires Python, pip, and a Hugging Face token for some models.',
   },
 }
 
@@ -139,6 +225,34 @@ function validateCommandPaths(command) {
   outputPaths.forEach(filePath => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true })
   })
+
+  return { ok: true }
+}
+
+/** After ffmpeg exit 0, verify outputs exist and are non-empty. */
+function validateStepOutputs(command) {
+  const { outputPaths } = extractCommandPaths(command)
+  if (outputPaths.length === 0) return { ok: true }
+
+  for (const filePath of outputPaths) {
+    if (!fs.existsSync(filePath)) {
+      return {
+        ok: false,
+        message: `ffmpeg exited successfully but no output was created: ${path.basename(filePath)}`,
+      }
+    }
+    try {
+      const stat = fs.statSync(filePath)
+      if (stat.size === 0) {
+        return {
+          ok: false,
+          message: `Output file is empty (0 bytes): ${path.basename(filePath)}. The command may have failed silently.`,
+        }
+      }
+    } catch (err) {
+      return { ok: false, message: `Could not read output file: ${path.basename(filePath)}` }
+    }
+  }
 
   return { ok: true }
 }
@@ -261,6 +375,10 @@ function runInstallerCommand(command) {
 
 // ── protocol & window ─────────────────────────────────────────────────────────
 
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.vizio.app')
+}
+
 app.whenReady().then(() => {
   protocol.registerFileProtocol('atom', (request, callback) => {
     const url = request.url.replace(/^atom:\/\//, '')
@@ -273,10 +391,14 @@ app.whenReady().then(() => {
 Menu.setApplicationMenu(null)
 
 function createWindow() {
+  const iconPath = app.isPackaged
+    ? path.join(app.getAppPath(), 'build', 'icon.ico')
+    : path.join(__dirname, '../build/icon.ico')
+
   const win = new BrowserWindow({
     width: 1280, height: 800, autoHideMenuBar: true,
     title: 'Vizio',
-    icon: path.join(__dirname, '../icon.png'),
+    icon: iconPath,
     backgroundColor: '#05070d',
     titleBarStyle: 'hidden',
     titleBarOverlay: {
@@ -293,7 +415,7 @@ function createWindow() {
     win.loadURL('http://localhost:5173')
     win.webContents.openDevTools()
   } else {
-    win.loadFile(path.join(__dirname, '../dist/index.html'))
+    win.loadFile(path.join(app.getAppPath(), 'dist', 'index.html'))
   }
 }
 
@@ -304,103 +426,47 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
 
-// ── AI call with retry + exponential backoff on 429 ───────────────────────────
-
-async function callAI(messages, config, retries = 3) {
-  const { baseUrl, apiKey, model, providerId } = config
-  const maxTokens = Number(config.maxTokens) > 0 ? Number(config.maxTokens) : 2048
-  const temperature = Number.isFinite(Number(config.temperature)) ? Number(config.temperature) : 0.2
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      let res
-      if (providerId === 'anthropic') {
-        res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model, max_tokens: maxTokens,
-            system: messages.find(m => m.role === 'system')?.content ?? '',
-            messages: messages.filter(m => m.role !== 'system'),
-          }),
-        })
-      } else {
-        res = await fetch(`${baseUrl}/chat/completions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-          },
-          body: JSON.stringify({
-            model, max_tokens: maxTokens, temperature,
-            messages,
-          }),
-        })
-      }
-
-      // 429 — wait and retry with backoff
-      if (res.status === 429) {
-        const retryAfter = parseInt(res.headers.get('retry-after') ?? '0', 10)
-        const wait = retryAfter > 0 ? retryAfter * 1000 : Math.min(2000 * attempt, 10000)
-        if (attempt < retries) {
-          await new Promise(r => setTimeout(r, wait))
-          continue
-        }
-        throw new Error('Rate limit — too many requests. Try again shortly.')
-      }
-
-      if (!res.ok) {
-        let body = {}
-        try { body = await res.json() } catch (_) {}
-        throw new Error(body?.error?.message || `HTTP ${res.status}`)
-      }
-
-      if (providerId === 'anthropic') {
-        const data = await res.json()
-        return data.content?.[0]?.text?.trim() ?? ''
-      }
-      const data = await res.json()
-      return data.choices?.[0]?.message?.content?.trim() ?? ''
-
-    } catch (err) {
-      if (attempt === retries) throw err
-      if (err.message?.includes('Rate limit')) throw err // don't retry our own throw
-      await new Promise(r => setTimeout(r, 1000 * attempt))
-    }
-  }
-}
-
 // ── IPC: run workflow ──────────────────────────────────────────────────────────
 
-ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, projectDir, apiKey, model, providerId, baseUrl }) => {
-  const config = { apiKey, model, providerId, baseUrl }
+ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, projectDir, model, providerId, baseUrl, maxTokens, temperature }) => {
+  const config = resolveAIConfig({ providerId, baseUrl, model, maxTokens, temperature })
   workflow = expandWorkflowSteps(workflow)
   const controller = new AbortController()
   workflowControllers.set(sessionId, controller)
 
-  // ── Create session output directory ─────────────────────────────────────────
-  const sessionDir = getSessionDir(sessionId)
+  const sessionDir = path.join(projectDir, 'sessions', sessionId)
+  const outputDir  = path.join(projectDir, 'output')
   fs.mkdirSync(sessionDir, { recursive: true })
+  fs.mkdirSync(outputDir,  { recursive: true })
   fs.mkdirSync(getLogDir(), { recursive: true })
 
   const log = createLogger(sessionId)
   log.setStatus('in_progress')
   log.setWorkflow(workflow)
 
-  const verifyHistory = [] // separate history just for verify calls
+  // ── Verify history — only used on failures ─────────────────────────────────────────────
+  const verifyHistory = [{
+    role: 'system',
+    content: 'You are a command verification assistant for a media processing agent on Windows.\n' +
+      'Available tools: ffmpeg, ffprobe, yt-dlp.\n' +
+      'RULES:\n' +
+      '- reverb does not exist as an ffmpeg filter — use aecho=0.8:0.88:60:0.4\n' +
+      '- Only use standard ffmpeg filters available in gyan.dev builds\n' +
+      '- Always include -y flag\n' +
+      '- Use full absolute Windows paths\n' +
+      '- Return ONLY valid JSON, no markdown, no explanation outside JSON',
+  }]
+
+  // ── Step execution result accumulator ──────────────────────────────────────
+  // This is what gets sent to AI at the end for the organic reply
+  const stepResults = []
 
   for (const step of workflow.steps) {
     if (controller.signal.aborted) {
       log.finish('cancelled')
       event.sender.send('agent:done', {
-        success: false,
-        cancelled: true,
-        sessionDir,
-        logFile: log.logFile,
+        success: false, cancelled: true,
+        sessionDir, logFile: log.logFile,
         message: 'Workflow cancelled.',
       })
       workflowControllers.delete(sessionId)
@@ -410,14 +476,21 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
     log.updateStepStatus(step.id, 'running')
     event.sender.send('agent:stepUpdate', { stepId: step.id, status: 'running', pct: 0 })
 
-    // ── Non-shell step dispatch (rename / delete / move / write) ────────────────
+    // ── Non-shell steps ──────────────────────────────────────────────────────
     if (step.type && step.type !== 'shell') {
       try {
         executeAgentStep(step, projectDir)
         log.updateStepStatus(step.id, 'completed')
         event.sender.send('agent:stepDone', { stepId: step.id, success: true })
+        stepResults.push({
+          stepId:  step.id,
+          title:   step.title,
+          type:    step.type,
+          success: true,
+          note:    step.type + ' operation completed',
+        })
       } catch (err) {
-        const msg = err.message || `Step "${step.title}" failed.`
+        const msg = err.message || ('Step "' + step.title + '" failed.')
         log.updateStepStatus(step.id, 'failed')
         event.sender.send('agent:stepDone', { stepId: step.id, success: false, message: msg })
         event.sender.send('agent:done', { success: false, sessionDir, logFile: log.logFile, message: msg })
@@ -425,43 +498,32 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
         workflowControllers.delete(sessionId)
         return
       }
-      continue // skip the ffmpeg retry loop
+      continue
     }
 
+    // ── Shell steps ──────────────────────────────────────────────────────────
     let currentCommand = step.command
-    let stepPassed = false
+    let stepPassed     = false
+    let finalResult    = null
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       if (attempt > 1) {
         event.sender.send('agent:stepUpdate', {
           stepId: step.id, status: 'running', pct: 0,
-          message: `Retrying (attempt ${attempt}/${MAX_RETRIES})…`,
+          message: 'Retrying (attempt ' + attempt + '/' + MAX_RETRIES + ')…',
         })
       }
 
       const pathCheck = validateCommandPaths(currentCommand)
       if (!pathCheck.ok) {
         log.recordAttempt(step.id, {
-          command: currentCommand,
-          stdout: '',
-          stderr: '',
-          exitSuccess: false,
-          aiSuccess: false,
-          aiMessage: pathCheck.message,
-          fixedCommand: null,
+          command: currentCommand, stdout: '', stderr: '',
+          exitSuccess: false, aiSuccess: false,
+          aiMessage: pathCheck.message, fixedCommand: null,
         })
         log.updateStepStatus(step.id, 'failed')
-        event.sender.send('agent:stepDone', {
-          stepId: step.id,
-          success: false,
-          message: pathCheck.message,
-        })
-        event.sender.send('agent:done', {
-          success: false,
-          sessionDir,
-          logFile: log.logFile,
-          message: pathCheck.message,
-        })
+        event.sender.send('agent:stepDone', { stepId: step.id, success: false, message: pathCheck.message })
+        event.sender.send('agent:done', { success: false, sessionDir, logFile: log.logFile, message: pathCheck.message })
         log.finish('completed_with_errors')
         workflowControllers.delete(sessionId)
         return
@@ -475,75 +537,66 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
       })
 
       if (controller.signal.aborted || result.error === 'Cancelled') {
-        log.recordAttempt(step.id, {
-          command: currentCommand,
-          stdout: result.stdout,
-          stderr: result.stderr,
-          exitSuccess: false,
-          aiSuccess: false,
-          aiMessage: 'Cancelled by user',
-          fixedCommand: null,
-        })
         log.updateStepStatus(step.id, 'cancelled')
         log.finish('cancelled')
         event.sender.send('agent:stepDone', { stepId: step.id, success: false, message: 'Cancelled by user' })
-        event.sender.send('agent:done', {
-          success: false,
-          cancelled: true,
-          sessionDir,
-          logFile: log.logFile,
-          message: 'Workflow cancelled.',
-        })
+        event.sender.send('agent:done', { success: false, cancelled: true, sessionDir, logFile: log.logFile, message: 'Workflow cancelled.' })
         workflowControllers.delete(sessionId)
         return
       }
 
-      // ── EXIT 0 = DONE. No AI call needed. ───────────────────────────────────
+      // ── Exit 0 — verify outputs then mark complete ─────────────────────────
+      if (result.success) {
+        const outputCheck = validateStepOutputs(currentCommand)
+        if (!outputCheck.ok) {
+          result = {
+            ...result,
+            success: false,
+            error: outputCheck.message,
+            stderr: `${result.stderr}\n${outputCheck.message}`,
+          }
+        }
+      }
+
       if (result.success) {
         log.recordAttempt(step.id, {
-          command:      currentCommand,
-          stdout:       result.stdout,
-          stderr:       result.stderr,
-          exitSuccess:  true,
-          aiSuccess:    true,
-          aiMessage:    'Completed successfully (exit 0)',
-          fixedCommand: null,
+          command: currentCommand, stdout: result.stdout, stderr: result.stderr,
+          exitSuccess: true, aiSuccess: true,
+          aiMessage: 'Completed (exit 0)', fixedCommand: null,
         })
         log.updateStepStatus(step.id, 'completed')
         event.sender.send('agent:stepDone', { stepId: step.id, success: true })
-        stepPassed = true
+        finalResult = result
+        stepPassed  = true
+        stepResults.push({
+          stepId:      step.id,
+          title:       step.title,
+          description: step.description,
+          type:        'shell',
+          success:     true,
+          command:     currentCommand,
+          summary:     extractFfmpegSummary(result.stderr),
+        })
         break
       }
 
-      // ── FAILED — ask AI to diagnose and fix ─────────────────────────────────
+      // ── Failed — local diagnosis first ──────────────────────────────────
       const localDiagnosis = diagnoseStepFailure(step, currentCommand, result)
       if (localDiagnosis) {
         log.recordAttempt(step.id, {
-          command: currentCommand,
-          stdout: result.stdout,
-          stderr: result.stderr,
-          exitSuccess: false,
-          aiSuccess: false,
-          aiMessage: localDiagnosis.message,
-          fixedCommand: null,
+          command: currentCommand, stdout: result.stdout, stderr: result.stderr,
+          exitSuccess: false, aiSuccess: false,
+          aiMessage: localDiagnosis.message, fixedCommand: null,
         })
         log.updateStepStatus(step.id, 'failed')
-        event.sender.send('agent:stepDone', {
-          stepId: step.id,
-          success: false,
-          message: localDiagnosis.message,
-        })
-        event.sender.send('agent:done', {
-          success: false,
-          sessionDir,
-          logFile: log.logFile,
-          message: localDiagnosis.message,
-        })
+        event.sender.send('agent:stepDone', { stepId: step.id, success: false, message: localDiagnosis.message })
+        event.sender.send('agent:done', { success: false, sessionDir, logFile: log.logFile, message: localDiagnosis.message })
         log.finish('completed_with_errors')
         workflowControllers.delete(sessionId)
         return
       }
 
+      // ── Ask AI to diagnose and fix ───────────────────────────────────────
       const verifyPrompt = buildVerifyPrompt(step, { ...result, command: currentCommand })
       verifyHistory.push({ role: 'user', content: verifyPrompt })
 
@@ -556,21 +609,13 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
         log.recordAttempt(step.id, {
           command: currentCommand, stdout: result.stdout, stderr: result.stderr,
           exitSuccess: false, aiSuccess: false,
-          aiMessage: `AI verify failed: ${aiErr.message}`, fixedCommand: null,
+          aiMessage: 'AI verify failed: ' + aiErr.message, fixedCommand: null,
         })
-        // Don't break — let the retry loop continue if attempts remain
         if (attempt === MAX_RETRIES) {
           log.updateStepStatus(step.id, 'failed')
-          event.sender.send('agent:stepDone', {
-            stepId: step.id, success: false,
-            message: `AI could not verify step after ${MAX_RETRIES} attempts: ${aiErr.message}`,
-          })
-          event.sender.send('agent:done', {
-            success: false,
-            sessionDir,
-            logFile: log.logFile,
-            message: `Step "${step.title}" failed: ${aiErr.message}`,
-          })
+          const msg = 'Step "' + step.title + '" could not be verified: ' + aiErr.message
+          event.sender.send('agent:stepDone', { stepId: step.id, success: false, message: msg })
+          event.sender.send('agent:done', { success: false, sessionDir, logFile: log.logFile, message: msg })
           log.finish('completed_with_errors')
           workflowControllers.delete(sessionId)
           return
@@ -579,31 +624,32 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
       }
 
       log.recordAttempt(step.id, {
-        command:      currentCommand,
-        stdout:       result.stdout,
-        stderr:       result.stderr,
-        exitSuccess:  false,
-        aiSuccess:    verification?.success ?? false,
-        aiMessage:    verification?.message ?? '',
+        command: currentCommand, stdout: result.stdout, stderr: result.stderr,
+        exitSuccess: false,
+        aiSuccess:   verification?.success ?? false,
+        aiMessage:   verification?.message ?? '',
         fixedCommand: verification?.fixed_command ?? null,
       })
 
       if (verification?.fixed_command) {
         currentCommand = verification.fixed_command
-        event.sender.send('agent:stepCmdUpdate', {
-          stepId: step.id, cmd: currentCommand, message: verification.message,
-        })
-        continue // retry with fixed command
+        event.sender.send('agent:stepCmdUpdate', { stepId: step.id, cmd: currentCommand, message: verification.message })
+        continue
       }
 
-      // Unfixable — AI said no fixed_command
+      // Unfixable
       log.updateStepStatus(step.id, 'failed')
-      event.sender.send('agent:stepDone', {
-        stepId: step.id, success: false, message: verification?.message,
+      const failMsg = verification?.message ?? ('Step "' + step.title + '" could not be completed.')
+      event.sender.send('agent:stepDone', { stepId: step.id, success: false, message: failMsg })
+
+      const errorReply = await buildAICompletionReply({
+        config, workflow, stepResults,
+        failedStep: { ...step, message: failMsg },
+        outputDir, success: false,
       })
       event.sender.send('agent:done', {
         success: false, sessionDir, logFile: log.logFile,
-        message: verification?.message ?? `Step "${step.title}" could not be completed.`,
+        message: errorReply, aiReply: true,
       })
       log.finish('completed_with_errors')
       workflowControllers.delete(sessionId)
@@ -614,26 +660,122 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
       log.updateStepStatus(step.id, 'failed')
       log.finish('completed_with_errors')
       workflowControllers.delete(sessionId)
+      const errorReply = await buildAICompletionReply({
+        config, workflow, stepResults,
+        failedStep: { ...step, message: 'Failed after ' + MAX_RETRIES + ' attempts' },
+        outputDir, success: false,
+      })
       event.sender.send('agent:done', {
         success: false, sessionDir, logFile: log.logFile,
-        message: `"${step.title}" failed after ${MAX_RETRIES} attempts.`,
+        message: errorReply, aiReply: true,
       })
       return
     }
   }
 
+  // ── All steps done — ask AI to compose a natural completion reply ──────────
   log.finish('completed')
+  const completionReply = await buildAICompletionReply({
+    config, workflow, stepResults, outputDir, success: true,
+  })
   event.sender.send('agent:done', {
     success: true, sessionDir, logFile: log.logFile,
+    message: completionReply, aiReply: true,
   })
   workflowControllers.delete(sessionId)
 })
 
+// ── Extract key info from ffmpeg stderr for the AI summary ────────────────────
+function extractFfmpegSummary(stderr) {
+  if (!stderr) return null
+  const lines = stderr.split('\n')
+  const useful = []
+  for (const line of lines) {
+    const l = line.trim()
+    if (/^Output #/.test(l))             useful.push(l)
+    if (/Stream.*Video:/.test(l))        useful.push(l.slice(0, 120))
+    if (/Stream.*Audio:/.test(l))        useful.push(l.slice(0, 120))
+    if (/Lsize=|muxing overhead/.test(l)) useful.push(l)
+  }
+  const progressLines = lines.filter(l => /Lsize=/.test(l))
+  if (progressLines.length > 0) useful.push(progressLines[progressLines.length - 1].trim())
+  return useful.slice(0, 8).join('\n') || null
+}
+
+// ── Ask AI to write a natural language completion/failure reply ────────────────
+async function buildAICompletionReply({ config, workflow, stepResults, failedStep, outputDir, success }) {
+  try {
+    let outputFileList = ''
+    try {
+      if (fs.existsSync(outputDir)) {
+        const files = fs.readdirSync(outputDir)
+          .filter(f => !f.startsWith('.'))
+          .map(f => {
+            const full  = path.join(outputDir, f)
+            const bytes = fs.statSync(full).size
+            const size  = bytes < 1024 * 1024
+              ? Math.round(bytes / 1024) + ' KB'
+              : (bytes / 1024 / 1024).toFixed(1) + ' MB'
+            return f + ' (' + size + ')'
+          })
+        outputFileList = files.length > 0 ? files.join(', ') : 'none'
+      }
+    } catch (_) {}
+
+    const stepSummary = stepResults.map(r => {
+      let line = 'Step ' + r.stepId + ' "' + r.title + '": ' + (r.success ? 'succeeded' : 'failed')
+      if (r.summary) line += '\n  ffmpeg output: ' + r.summary
+      return line
+    }).join('\n')
+
+    const failureNote = failedStep
+      ? '\nFailed at step "' + failedStep.title + '": ' + failedStep.message
+      : ''
+
+    const prompt = success
+      ? 'A media processing workflow just completed successfully.\n\n' +
+        'Workflow goal: "' + workflow.message + '"\n' +
+        'Steps executed:\n' + stepSummary + '\n\n' +
+        'Output files created: ' + outputFileList + '\n' +
+        'Output folder: ' + outputDir + '\n\n' +
+        'Write a SHORT, friendly, plain English reply to the user confirming what was done and what files were created.\n' +
+        '- Mention the output filename(s) specifically\n' +
+        '- If relevant, mention key details like duration, format, or size\n' +
+        '- Do NOT use markdown, bullet points, or headers\n' +
+        '- Keep it under 3 sentences\n' +
+        '- Do NOT say "as an AI" or similar\n' +
+        '- Reply as if you just did the work yourself'
+      : 'A media processing workflow failed.\n\n' +
+        'Workflow goal: "' + workflow.message + '"\n' +
+        'Steps that ran:\n' + stepSummary + '\n' + failureNote + '\n\n' +
+        'Write a SHORT, honest reply explaining what failed and what the user can try.\n' +
+        '- Be specific about what went wrong\n' +
+        '- Suggest one concrete fix if possible\n' +
+        '- Do NOT use markdown or bullet points\n' +
+        '- Keep it under 3 sentences\n' +
+        '- Do NOT say "as an AI" or similar'
+
+    const raw = await callAI([
+      { role: 'system', content: 'You are Vizio, a desktop media processing agent. Respond only with plain conversational text — no JSON, no markdown.' },
+      { role: 'user', content: prompt },
+    ], config, 2)
+
+    if (raw && raw.trim()) return raw.trim()
+    return success
+      ? 'Done! Output: ' + (outputFileList !== 'none' ? outputFileList : 'Check the output files tab.')
+      : 'The workflow failed at "' + (failedStep ? failedStep.title : 'a step') + '". Check the session log for details.'
+
+  } catch (err) {
+    return success
+      ? 'Workflow complete. Check the output files tab for results.'
+      : 'Workflow failed. Check the session log for details.'
+  }
+}
 // ── IPC: file ops ──────────────────────────────────────────────────────────────
 
 ipcMain.handle('agent:scanTools',   () => scanTools().then(formatToolsBlock))
 ipcMain.handle('agent:probeFiles',  (_, paths) => probeFiles(paths))
-ipcMain.handle('tools:scan',        () => scanTools()) // For MainPage UI status
+ipcMain.handle('tools:scan',        (_, opts) => scanToolsWithBlock(opts))
 ipcMain.handle('bins:status', async () => {
   const results = {}
 
@@ -661,12 +803,33 @@ ipcMain.handle('tools:install', async (_, toolId) => {
   const result = await runInstallerCommand(installer.command)
   return { ...result, command: installer.command, note: installer.note }
 })
+ipcMain.handle('files:readBase64', async (_, filePaths) => {
+  const results = []
+  for (const filePath of filePaths) {
+    try {
+      const data = fs.readFileSync(filePath)
+      const base64 = data.toString('base64')
+      const ext = path.extname(filePath).toLowerCase().replace('.', '')
+      const mimeMap = {
+        jpg: 'image/jpeg', jpeg: 'image/jpeg',
+        png: 'image/png', webp: 'image/webp',
+        gif: 'image/gif',
+      }
+      const mediaType = mimeMap[ext] ?? 'image/jpeg'
+      results.push({ path: filePath, base64, mediaType, ok: true })
+    } catch (err) {
+      results.push({ path: filePath, ok: false, error: err.message })
+    }
+  }
+  return results
+})
 ipcMain.handle('files:probe',       (_, paths) => probeFiles(paths))
 
 // Project handlers
 ipcMain.handle('project:getAll',    () => getAllProjects())
 ipcMain.handle('project:create',    (_, { name, folderPath }) => createProject({ name, folderPath }))
 ipcMain.handle('project:setLast',   (_, id) => setLastProject(id))
+ipcMain.handle('project:delete',    (_, id) => deleteProject(id))
 ipcMain.handle('project:getMedia',  (_, projectDir) => getProjectMedia(projectDir))
 ipcMain.handle('project:getOutputs', (_, projectDir) => getProjectOutputs(projectDir))
 ipcMain.handle('project:copyMedia', (_, { sourcePath, projectDir }) => copyMediaToProject(sourcePath, projectDir))
@@ -727,9 +890,9 @@ ipcMain.handle('session:readLog', (_, sessionId) => {
   } catch { return null }
 })
 
-ipcMain.handle('session:listFiles', (_, sessionId) => {
+ipcMain.handle('session:listFiles', (_, { sessionId, projectDir }) => {
   try {
-    const dir = getSessionDir(sessionId)
+    const dir = path.join(projectDir, 'sessions', sessionId)
     if (!fs.existsSync(dir)) return []
     return fs.readdirSync(dir)
       .filter(f => !f.startsWith('.'))
@@ -765,4 +928,3 @@ ipcMain.handle('agent:renameFile',  (_, { projectDir, oldPath, newPath }) => ren
 ipcMain.handle('agent:moveFile',    (_, { projectDir, srcPath, destPath }) => moveProjectFile(projectDir, srcPath, destPath))
 ipcMain.handle('agent:readText',    (_, { projectDir, filePath })        => readProjectText(projectDir, filePath))
 ipcMain.handle('agent:writeText',   (_, { projectDir, filePath, content }) => writeProjectText(projectDir, filePath, content))
-

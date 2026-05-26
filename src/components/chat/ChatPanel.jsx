@@ -1,6 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { settingsStore } from '../../store/settingsStore'
+import { useSecureKeys } from '../../hooks/useSecureKeys'
+import { streamChat, completeChat } from '../../lib/aiBridge'
 import './ChatPanel.css'
+
+export const TASK_PRESETS = [
+  { label: 'Trim 30s', prompt: 'Trim the selected video to the first 30 seconds and save to the output folder.' },
+  { label: 'To WebP', prompt: 'Convert the attached images to WebP in the output folder.' },
+  { label: 'Extract MP3', prompt: 'Extract audio from the selected video as MP3 in the output folder.' },
+  { label: 'Compress', prompt: 'Compress the selected video for a smaller file (H.264, good quality) in the output folder.' },
+  { label: '720p scale', prompt: 'Scale the selected video to 1280x720 and save to the output folder.' },
+  { label: 'Mute audio', prompt: 'Remove audio from the selected video and save to the output folder.' },
+]
 
 const CHAT_MAX_TOKENS = 4000
 const CHAT_HISTORY_LIMIT = 10
@@ -50,7 +61,7 @@ function buildProjectStateBlock(projectFiles = [], outputFiles = [], projectDir 
   return lines.join('\n')
 }
 
-function buildSystemPrompt(toolsBlock, fileBlock, projectStateBlock, outputDir, workflowBlock = '') {
+function buildSystemPrompt(toolsBlock, fileBlock, projectStateBlock, outputDir, memoryBlock = '', workflowBlock = '') {
   return `You are Vizio, a desktop media processing AGENT with direct control over the project folder.
 You are not a chatbot -- you are an autonomous agent that can read, write, rename, move and delete files inside the project.
 
@@ -60,10 +71,20 @@ ${fileBlock}
 
 ${projectStateBlock}
 
+${memoryBlock}
+
 ${workflowBlock}
 
+## PLANNING CHECKLIST (follow before every workflow)
+1. Identify every input file from PROJECT STATE, attached files, and @mentions -- use exact absolute paths.
+2. Decide output path(s) under: ${outputDir}
+3. Pick the simplest ffmpeg command that meets the goal (avoid re-encoding video if stream copy works).
+4. For 4+ files with the SAME operation, use batch_shell (see below). Otherwise use individual shell steps.
+5. If quality/format/duration is ambiguous, use clarify mode -- do not guess critical settings.
+6. Never use bash loops, && chains, or mkdir for the output folder.
+
 ## COMPACT BATCH FORMAT
-For 4 or more files with the same operation, use one compact step instead of repeating long commands:
+For 4 or more files with the identical operation, use batch_shell (preferred over repeating steps):
 {
   "id": 1,
   "type": "batch_shell",
@@ -73,45 +94,40 @@ For 4 or more files with the same operation, use one compact step instead of rep
   "output_template": "${outputDir}/{base}_fixed.{ext}",
   "command_template": "ffmpeg -y -i \\"{input}\\" -c copy \\"{output}\\""
 }
-The app expands batch_shell into one real shell step per file. Placeholders: "{input}", "{output}", "{name}", "{base}", "{ext}".
-This compact batch format overrides any later instruction that says to create one step per file.
+Placeholders: {input}, {output}, {name}, {base}, {ext}. The app expands this into one shell step per file.
+
+## COMMON FFMPEG PATTERNS (Windows paths, always -y)
+- Trim: ffmpeg -y -i "IN" -t 30 -c copy "OUT"
+- Scale 720p: ffmpeg -y -i "IN" -vf scale=1280:720 -c:v libx264 -crf 23 "OUT"
+- Extract audio: ffmpeg -y -i "IN" -vn -c:a libmp3lame -q:a 2 "OUT.mp3"
+- Mute: ffmpeg -y -i "IN" -an -c:v copy "OUT"
+- Image to WebP: ffmpeg -y -i "IN" "OUT.webp"
+- Re-encode smaller: ffmpeg -y -i "IN" -c:v libx264 -crf 28 -c:a aac -b:a 128k "OUT"
+- No "reverb" filter -- use aecho=0.8:0.88:60:0.4 for echo effects
 
 ## OUTPUT DIRECTORY
 ${outputDir}
-All output files must be saved here unless the user specifies otherwise. Use full absolute paths.
+All output files must be saved here unless the user specifies otherwise. Use full absolute Windows paths.
 
 ## AGENT STEP TYPES
-Workflow steps can use these types in addition to shell commands:
-- "shell" (default) -- runs any system command (ffmpeg, whisper, yt-dlp, etc.)
-- "rename" -- renames a file inside the project. Fields: "from" (current abs path), "to" (new abs path)
-- "delete" -- permanently deletes a file inside the project. Fields: "path"
-- "move"   -- moves a file to another project subfolder. Fields: "from", "to"
-- "write"  -- writes a text file (subtitles, notes, scripts). Fields: "path", "content"
-All paths for non-shell steps must be absolute and inside the project folder.
+- "shell" -- ffmpeg, ffprobe, yt-dlp, whisper, etc.
+- "rename" -- fields: from, to (absolute paths)
+- "delete" -- field: path
+- "move"   -- fields: from, to
+- "write"  -- fields: path, content (text files)
 
 ## PLATFORM
-Windows 10/11. All shell commands run in PowerShell / cmd.exe.
-NEVER use bash/Linux syntax: no \`for f in *.ext\`, no \`%f\`, no \`&&\`, no \`mkdir -p\`.
-For batch operations: create ONE STEP PER FILE using the exact absolute paths from PROJECT STATE -- do NOT write shell loops.
-The output folder already exists -- never create it with a command.
+Windows 10/11. PowerShell/cmd only. No bash syntax.
 
 ## RULES
-1. Respond ONLY with a JSON object and nothing else -- no markdown, no explanation before or after.
-2. Always use -y in ffmpeg commands.
-3. Use full absolute paths for all input and output files.
-4. Output files go in the output directory above unless the user says otherwise.
-5. If a task needs a missing tool, use chat mode and explain what to install.
-6. Never show shell commands to the user. Only show user-facing messages.
-7. Keep messages concise and plain.
-8. If the request is unclear, ask follow-up questions instead of guessing.
-9. A workflow response is a proposed plan. The app will ask for confirmation before running.
-10. For downloads or transcodes, ask a clarifying question first if important preferences are missing.
-11. If a file is mentioned with @ in the chat, the @ is only mention syntax. Never include @ in the real filename or path.
-12. Do not say "as an AI", "I cannot directly", or similar disclaimers. You are an agent -- act like one.
-13. When a workflow finishes, you can propose follow-up actions based on the new output files.
-14. You can clean up intermediate/temp files using delete steps after a workflow completes.
-15. For batch jobs (e.g. convert all images), list all source file paths from PROJECT STATE and create one workflow step per file.
-16. When multiple files are explicitly mentioned in a request, you MUST process ALL of them. Include every mentioned file in your workflow steps with their full absolute paths.
+1. Respond ONLY with a JSON object -- no markdown fences, no text outside JSON.
+2. Always use -y in ffmpeg commands; use full absolute paths.
+3. If a tool is missing, use chat mode and tell the user what to install in Tools.
+4. Never show raw shell commands in "message" fields -- user-facing text only.
+5. Workflows require user confirmation before running.
+6. @mentions are syntax only -- never put @ in real paths.
+7. Process ALL files the user mentioned or attached.
+8. Use conversation memory for follow-ups (e.g. "make it smaller" refers to the last output).
 
 ## RESPONSE MODES
 
@@ -552,105 +568,6 @@ function buildCompletionSummary(workflow) {
   return lines.join('\n')
 }
 
-async function callAI(messages, config, retries = 2, signal) {
-  const { baseUrl, apiKey, model, providerId } = config
-  const maxTokens = Number(config.maxTokens) > 0 ? Number(config.maxTokens) : CHAT_MAX_TOKENS
-  const temperature = Number.isFinite(Number(config.temperature)) ? Number(config.temperature) : 0.2
-
-  function wait(ms) {
-    return new Promise((resolve, reject) => {
-      if (signal?.aborted) {
-        const err = new Error('Aborted')
-        err.cancelled = true
-        reject(err)
-        return
-      }
-      const timer = setTimeout(resolve, ms)
-      signal?.addEventListener?.('abort', () => {
-        clearTimeout(timer)
-        const err = new Error('Aborted')
-        err.cancelled = true
-        reject(err)
-      }, { once: true })
-    })
-  }
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    let res
-
-    try {
-      if (providerId === 'anthropic') {
-        res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          signal,
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model,
-            max_tokens: maxTokens,
-            system: messages.find(message => message.role === 'system')?.content ?? '',
-            messages: messages.filter(message => message.role !== 'system'),
-          }),
-        })
-      } else {
-        res = await fetch(`${baseUrl}/chat/completions`, {
-          method: 'POST',
-          signal,
-          headers: {
-            'Content-Type': 'application/json',
-            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-          },
-          body: JSON.stringify({
-            model,
-            temperature,
-            max_tokens: maxTokens,
-            stream: false,
-            messages,
-          }),
-        })
-      }
-    } catch (networkErr) {
-      const err = new Error(networkErr.message)
-      err.status = 0
-      err.cancelled = networkErr.name === 'AbortError'
-      throw err
-    }
-
-    if (res.status === 429) {
-      const retryAfter = parseInt(res.headers.get('retry-after') ?? '0', 10)
-      const waitMs = retryAfter > 0 ? retryAfter * 1000 : 1500 * attempt
-      if (attempt < retries) {
-        await wait(waitMs)
-        continue
-      }
-    }
-
-    if (!res.ok) {
-      let errBody = {}
-      try {
-        errBody = await res.json()
-      } catch (_) { }
-      const message = errBody?.error?.message || errBody?.message || `HTTP ${res.status}`
-      const err = new Error(typeof message === 'string' ? message : JSON.stringify(message))
-      err.status = res.status
-      throw err
-    }
-
-    if (providerId === 'anthropic') {
-      const data = await res.json()
-      return data.content?.[0]?.text?.trim() ?? ''
-    }
-
-    const data = await res.json()
-    return data.choices?.[0]?.message?.content?.trim() ?? ''
-  }
-
-  return ''
-}
-
 function parseAPIError(err, providerId) {
   const msg = err.message ?? ''
   const status = err.status ?? 0
@@ -694,11 +611,45 @@ function buildWorkflowContext(state) {
   if (state.status === 'completed') {
     return `## Latest Workflow Result\nStatus: completed\nSummary: ${state.message}`
   }
-  if (state.status === 'running') {
-    return `## Latest Workflow Result\nStatus: running\nSummary: ${state.message}`
+  if (state.status === 'running' || state.status === 'pending') {
+    return `## Latest Workflow Result\nStatus: ${state.status}\nSummary: ${state.message}`
   }
 
   return ''
+}
+
+function buildConversationMemory(history, outputFiles = [], workflowState = null) {
+  const lines = ['## CONVERSATION MEMORY']
+  const recent = history.slice(-CHAT_HISTORY_LIMIT)
+
+  const userTurns = recent
+    .filter(m => m.role === 'user')
+    .slice(-4)
+    .map(m => m.content?.slice(0, 180))
+    .filter(Boolean)
+
+  if (userTurns.length > 0) {
+    lines.push('Recent user requests (oldest first):')
+    userTurns.forEach((text, i) => lines.push(`  ${i + 1}. ${text}`))
+  }
+
+  const lastAssistant = [...recent].reverse().find(m => m.role === 'assistant')
+  if (lastAssistant?.content) {
+    const snippet = lastAssistant.content.slice(0, 300)
+    lines.push(`Last assistant response (snippet): ${snippet}`)
+  }
+
+  if (outputFiles.length > 0) {
+    lines.push('Recent output files (newest first):')
+    outputFiles.slice(0, 6).forEach(f => {
+      lines.push(`  - ${f.name} [${f.ext}, ${f.size}] path: ${f.path}`)
+    })
+  }
+
+  const wf = buildWorkflowContext(workflowState)
+  if (wf) lines.push(wf)
+
+  return lines.join('\n')
 }
 
 function pushAssistantHistory(historyRef, content) {
@@ -720,6 +671,7 @@ export default function ChatPanel({
   onWorkflowComplete,
   attachedFiles = [],
   onClearAttachments,
+  onMentionFiles,
   onPendingWorkflow,
 }) {
   const [messages, setMessages] = useState([])
@@ -727,10 +679,14 @@ export default function ChatPanel({
   const [loading, setLoading] = useState(false)
   const [apiError, setApiError] = useState(null)
   const [attachmentsExpanded, setAttachmentsExpanded] = useState(false)
+  const [showMediaPicker, setShowMediaPicker] = useState(false)
+  const [editingSourceMessage, setEditingSourceMessage] = useState(null)
 
   const historyRef = useRef([])
   const lastInputRef = useRef('')
   const inputRef = useRef(null)
+  const mediaPickerRef = useRef(null)
+  const attachImageBtnRef = useRef(null)
   const endRef = useRef(null)
   const saveChatTimer = useRef(null)
   const currentChatId = useRef(null)
@@ -741,6 +697,10 @@ export default function ChatPanel({
   const currentWorkflowRef = useRef(null)
   const currentSessionIdRef = useRef(null)
   const aiAbortRef = useRef(null)
+  const streamMsgIdRef = useRef(null)
+  const { isActiveReady } = useSecureKeys()
+  const config = settingsStore.getActiveConfig()
+  const imageLibraryFiles = projectFiles.filter(file => IMAGE_EXTS.has(file.ext))
 
   useEffect(() => {
     onMentionReady?.(insertMention)
@@ -788,6 +748,21 @@ export default function ChatPanel({
   useEffect(() => {
     return () => clearTimeout(saveChatTimer.current)
   }, [])
+
+  useEffect(() => {
+    function handleOutsideClick(event) {
+      if (!showMediaPicker) return
+      const target = event.target
+      const clickedInsidePicker = mediaPickerRef.current?.contains(target)
+      const clickedAttachBtn = attachImageBtnRef.current?.contains(target)
+      if (!clickedInsidePicker && !clickedAttachBtn) {
+        setShowMediaPicker(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [showMediaPicker])
 
   function persistChat(msgs, hist, chatId) {
     if (!project || !chatId) return
@@ -883,10 +858,11 @@ export default function ChatPanel({
       workflow,
       sessionId: sid,
       projectDir: project.folderPath,
-      apiKey: cfg.apiKey,
       model: cfg.model,
       providerId: cfg.providerId,
       baseUrl: cfg.baseUrl,
+      maxTokens: cfg.maxTokens,
+      temperature: cfg.temperature,
     })
   }
 
@@ -934,28 +910,39 @@ export default function ChatPanel({
       }
     })
 
-    const u3 = window.electron.onWorkflowDone(({ success, message }) => {
+    const u3 = window.electron.onWorkflowDone(({ success, message, aiReply }) => {
       setLoading(false)
       currentSessionIdRef.current = null
       onTaskUpdate?.(prev => prev.map((task, index) =>
         index === prev.length - 1 ? { ...task, status: success ? 'done' : 'failed' } : task
       ))
+
       if (success) {
         workflowStateRef.current = {
           status: 'completed',
           message: 'The last workflow completed successfully.',
         }
         onWorkflowComplete?.()
-        const summary = currentWorkflowRef.current
-          ? buildCompletionSummary(currentWorkflowRef.current)
-          : 'All done! Check the **output files** tab for created media.'
-        addAiMessage(summary)
+
+        // Use AI-composed reply if available, otherwise fall back
+        const reply = (aiReply && message)
+          ? message
+          : currentWorkflowRef.current
+            ? buildCompletionSummary(currentWorkflowRef.current)
+            : 'All done! Check the output files tab.'
+
+        addAiMessage(reply)
       } else {
         workflowStateRef.current = {
           status: 'failed',
           message: message || 'The last workflow failed.',
         }
-        addAiMessage(message || 'Task failed. Check the **session log** for details.')
+        // Use AI-composed failure explanation if available
+        const reply = (aiReply && message)
+          ? message
+          : message || 'Task failed. Check the session log for details.'
+
+        addAiMessage(reply)
       }
     })
 
@@ -986,13 +973,32 @@ export default function ChatPanel({
     addAiMessage('Workflow dismissed. Let me know if you\'d like to try something different.')
   }
 
-  async function handleSend() {
-    const text = input.trim()
+  function toggleAttachLibraryFile(fileName) {
+    if (attachedFiles.includes(fileName)) {
+      onClearAttachments?.(attachedFiles.filter(name => name !== fileName))
+      return
+    }
+    onMentionFiles?.([fileName])
+  }
+
+  function beginEditPrompt(msg) {
+    setEditingSourceMessage(msg.id)
+    setInput(msg.content || '')
+    setShowMediaPicker(false)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  async function redoPrompt(msg) {
+    setEditingSourceMessage(null)
+    setShowMediaPicker(false)
+    await handleSend(msg.content || '')
+  }
+
+  async function handleSend(promptOverride = null) {
+    const text = (promptOverride ?? input).trim()
     if ((!text && attachedFiles.length === 0) || loading) return
 
-    const config = settingsStore.getActiveConfig()
-
-    if (!config.isLocal && !config.apiKey?.trim()) {
+    if (!config.isLocal && !isActiveReady) {
       setApiError({ type: 'auth', title: 'No API key', body: `Add your ${config.label} API key in Settings.` })
       return
     }
@@ -1013,8 +1019,36 @@ export default function ChatPanel({
       fullText = text ? `Process ${attachedFiles.length} attached files: ${text}` : `Process ${attachedFiles.length} attached files`
     }
     lastInputRef.current = fullText
-    setInput('')
+    if (promptOverride === null) {
+      setInput('')
+    }
+    setEditingSourceMessage(null)
     onClearAttachments?.()
+
+    const imageAttachments = attachedFiles.filter(name => {
+      const ext = name.split('.').pop().toLowerCase()
+      return IMAGE_EXTS.has(ext)
+    })
+
+    let imageBlocks = []
+    if (imageAttachments.length > 0) {
+      const imagePaths = imageAttachments
+        .map(name => projectFiles.find(f => f.name === name))
+        .filter(Boolean)
+        .map(f => f.path)
+
+      try {
+        const results = await window.electron.readFilesBase64(imagePaths)
+        imageBlocks = results
+          .filter(result => result.ok)
+          .map(result => ({
+            type: 'image',
+            source: { type: 'base64', media_type: result.mediaType, data: result.base64 },
+          }))
+      } catch (err) {
+        console.warn('Failed to read image files:', err)
+      }
+    }
 
     const userMsg = { id: Date.now(), role: 'user', type: 'text', content: fullText }
     const nextMsgs = [...messages, userMsg]
@@ -1044,18 +1078,58 @@ export default function ChatPanel({
         return
       }
 
+      const memoryBlock = buildConversationMemory(
+        historyRef.current,
+        outputFiles,
+        workflowStateRef.current,
+      )
+
       const systemPrompt = buildSystemPrompt(
         toolsBlock ?? '## Tools\nffmpeg available\nffprobe available',
         buildFileBlock(activeFile, probeData, projectFiles, fullText, attachedFiles),
         buildProjectStateBlock(projectFiles, outputFiles, project?.folderPath, attachedFiles),
         paths.outputDir,
-        buildWorkflowContext(workflowStateRef.current)
+        memoryBlock,
+        buildWorkflowContext(workflowStateRef.current),
       )
 
+      const requestMessages = buildRequestMessages(systemPrompt, historyRef.current)
+      let messagesForAI = requestMessages
+      if (imageBlocks.length > 0) {
+        const withoutLast = requestMessages.slice(0, -1)
+        const lastMsg = requestMessages[requestMessages.length - 1]
+        messagesForAI = [
+          ...withoutLast,
+          {
+            role: 'user',
+            content: [
+              ...imageBlocks,
+              { type: 'text', text: lastMsg.content },
+            ],
+          },
+        ]
+      }
+
       aiAbortRef.current = new AbortController()
-      const raw = await callAI(buildRequestMessages(systemPrompt, historyRef.current), config, 2, aiAbortRef.current.signal)
+
+      const streamId = thinkingId
+      streamMsgIdRef.current = streamId
+      setMessages(prev => prev.map(m =>
+        m.id === thinkingId ? { ...m, type: 'streaming', content: '' } : m,
+      ))
+
+      const raw = await streamChat(messagesForAI, {
+        signal: aiAbortRef.current.signal,
+        onDelta: (delta) => {
+          setMessages(prev => prev.map(m =>
+            m.id === streamId ? { ...m, content: (m.content || '') + delta } : m,
+          ))
+        },
+      })
+
       aiAbortRef.current = null
-      setMessages(prev => prev.filter(message => message.id !== thinkingId))
+      streamMsgIdRef.current = null
+      setMessages(prev => prev.filter(message => message.id !== thinkingId && message.type !== 'streaming'))
 
       let parsed = normalizeAIResponse(parseAIResponse(raw))
       let responseForHistory = raw
@@ -1063,7 +1137,7 @@ export default function ChatPanel({
       // -- Auto-retry if the response isn't valid JSON --------------------------
       if (!parsed) {
         const fixMessages = [
-          ...buildRequestMessages(systemPrompt, historyRef.current),
+          ...messagesForAI,
           { role: 'assistant', content: raw },
           {
             role: 'user',
@@ -1075,7 +1149,7 @@ export default function ChatPanel({
         ]
         try {
           aiAbortRef.current = new AbortController()
-          const raw2 = await callAI(fixMessages, config, 1, aiAbortRef.current.signal)
+          const raw2 = await completeChat(fixMessages, { retries: 1 })
           aiAbortRef.current = null
           parsed = normalizeAIResponse(parseAIResponse(raw2))
           if (parsed) responseForHistory = raw2
@@ -1117,8 +1191,11 @@ export default function ChatPanel({
       addAiMessage(parsed.message ?? raw)
       setLoading(false)
     } catch (err) {
-      setMessages(prev => prev.filter(message => message.id !== thinkingId))
+      setMessages(prev => prev.filter(message =>
+        message.id !== thinkingId && message.type !== 'streaming',
+      ))
       aiAbortRef.current = null
+      streamMsgIdRef.current = null
       if (!err.cancelled) {
         setApiError(parseAPIError(err, settingsStore.getActiveConfig().providerId))
       }
@@ -1133,8 +1210,12 @@ export default function ChatPanel({
     }
   }
 
-  const config = settingsStore.getActiveConfig()
-  const isReady = config.isLocal || !!config.apiKey?.trim()
+  const isReady = config.isLocal || isActiveReady
+
+  function applyPreset(prompt) {
+    setInput(prompt)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
 
   return (
     <div className="chat-panel">
@@ -1144,12 +1225,31 @@ export default function ChatPanel({
             <div className="chat-empty-icon">+</div>
             <div className="chat-empty-text">What do you want to do?</div>
             <div className="chat-empty-sub">Describe an edit, ask a question, or mention a file with @</div>
+            <div className="task-presets">
+              {TASK_PRESETS.map(preset => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  className="task-preset-chip"
+                  disabled={!isReady || loading}
+                  onClick={() => applyPreset(preset.prompt)}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {messages.map(message => (
           message.type === 'approval'
             ? <ApprovalCard key={message.id} workflow={message.workflow} onAllow={handleApprove} onDismiss={handleDismiss} />
-            : <Message key={message.id} msg={message} />
+            : <Message
+                key={message.id}
+                msg={message}
+                canEdit={message.role === 'user' && message.type === 'text' && !loading}
+                onEdit={() => beginEditPrompt(message)}
+                onRedo={() => redoPrompt(message)}
+              />
         ))}
         <div ref={endRef} />
       </div>
@@ -1178,6 +1278,36 @@ export default function ChatPanel({
       )}
 
       <div className={`chat-input-wrap ${!isReady ? 'chat-input-blocked' : ''}`}>
+        {editingSourceMessage && (
+          <div className="editing-banner">
+            <span>Editing previous prompt. Sending will submit this as a new prompt.</span>
+            <button onClick={() => setEditingSourceMessage(null)}>Cancel</button>
+          </div>
+        )}
+
+        {showMediaPicker && (
+          <div className="media-picker media-picker-slideup" ref={mediaPickerRef}>
+            <div className="media-picker-title">Add image as context</div>
+            {imageLibraryFiles.length === 0 && (
+              <div className="media-picker-empty">No images in Media Library yet.</div>
+            )}
+            {imageLibraryFiles.length > 0 && imageLibraryFiles.map(file => {
+              const selected = attachedFiles.includes(file.name)
+              return (
+                <button
+                  key={file.path}
+                  className={`media-picker-item ${selected ? 'selected' : ''}`}
+                  type="button"
+                  onClick={() => toggleAttachLibraryFile(file.name)}
+                >
+                  <img src={`atom://${file.path}`} alt="" />
+                  <span>{file.name}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {attachedFiles.length > 0 && (
           <div
             className="chat-attachments"
@@ -1187,20 +1317,32 @@ export default function ChatPanel({
             {(attachmentsExpanded || attachedFiles.length <= 3
               ? attachedFiles
               : attachedFiles.slice(0, 2)
-            ).map(name => (
-              <span key={name} className="attachment-chip">
-                @{name}
-                <button
-                  className="attachment-remove"
-                  onClick={() => onClearAttachments?.(attachedFiles.filter(n => n !== name))}
-                  title="Remove"
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                  </svg>
-                </button>
-              </span>
-            ))}
+            ).map(name => {
+              const isImage = ['png','jpg','jpeg','webp','gif'].includes(name.split('.').pop().toLowerCase())
+              const fileObj = isImage ? projectFiles.find(f => f.name === name) : null
+
+              return (
+                <span key={name} className={`attachment-chip ${isImage ? 'image-chip' : ''}`}>
+                  {isImage && fileObj && (
+                    <img
+                      src={`atom://${fileObj.path}`}
+                      className="chip-thumb"
+                      alt=""
+                    />
+                  )}
+                  {isImage ? '👁 ' : '@'}{name}
+                  <button
+                    className="attachment-remove"
+                    onClick={() => onClearAttachments?.(attachedFiles.filter(n => n !== name))}
+                    title="Remove"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                      <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                </span>
+              )
+            })}
             {!attachmentsExpanded && attachedFiles.length > 3 && (
               <span className="attachment-chip attachment-more">
                 +{attachedFiles.length - 2} more
@@ -1209,6 +1351,20 @@ export default function ChatPanel({
           </div>
         )}
         <div className="chat-input-area">
+          <button
+            ref={attachImageBtnRef}
+            className="attach-image-icon"
+            type="button"
+            disabled={!isReady || loading}
+            onClick={() => setShowMediaPicker(prev => !prev)}
+            title="Add image as context"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.6" />
+              <circle cx="9" cy="10" r="1.6" fill="currentColor" />
+              <path d="M6 16l4-4 3 3 3-2 2 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
           <textarea
             ref={inputRef}
             className="chat-input"
@@ -1305,7 +1461,7 @@ function ApprovalCard({ workflow, onAllow, onDismiss }) {
   )
 }
 
-function Message({ msg }) {
+function Message({ msg, canEdit, onEdit, onRedo }) {
   if (msg.type === 'thinking') {
     return (
       <div className="msg ai">
@@ -1316,9 +1472,37 @@ function Message({ msg }) {
     )
   }
 
+  if (msg.type === 'streaming') {
+    return (
+      <div className="msg ai">
+        <div className="bubble streaming">
+          {msg.content ? <MessageContent content={msg.content} /> : (
+            <div className="typing-dots"><span /><span /><span /></div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={`msg ${msg.role}`}>
-      <div className="bubble"><MessageContent content={msg.content} /></div>
+      <div className="bubble">
+        <MessageContent content={msg.content} />
+        {canEdit && (
+          <div className="msg-actions">
+            <button type="button" onClick={onEdit} title="Edit prompt">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4 20h4l10-10-4-4L4 16v4z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+              </svg>
+            </button>
+            <button type="button" onClick={onRedo} title="Redo prompt">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M20 12a8 8 0 1 1-2.34-5.66L20 9M20 4v5h-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

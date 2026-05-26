@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import ConfirmDialog from '../components/ui/ConfirmDialog'
 import './ToolsPage.css'
 
 const TOOLS = [
@@ -8,7 +9,7 @@ const TOOLS = [
     icon: 'py',
     color: 'blue',
     name: 'Python',
-    tagline: 'Runtime required for pip-based tools like Whisper, yt-dlp and pyannote',
+    tagline: 'Runtime required for pip-based tools like Whisper and yt-dlp',
     installed: false,
     caps: ['pip packages', 'AI tools', 'tool runtime'],
     requires: ['Windows package manager or python.org installer'],
@@ -108,26 +109,6 @@ const TOOLS = [
     },
   },
   {
-    id: 'pyannote',
-    scanNames: ['pyannote'],
-    icon: 'py',
-    color: 'amber',
-    name: 'pyannote',
-    tagline: 'Speaker diarization — who spoke when',
-    installed: false,
-    badge: 'needs HuggingFace token',
-    caps: ['speaker detection', 'diarization', 'timestamps'],
-    requires: ['Python 3.9+', 'pip', 'PyTorch', 'Hugging Face token'],
-    setup: {
-      'all platforms': [
-        { label: 'Accept model conditions at huggingface.co/pyannote/speaker-diarization', cmd: 'pip install pyannote.audio' },
-        { label: 'Add your HuggingFace token in Settings → API keys', cmd: 'HF_TOKEN=your_token_here' },
-      ],
-      verify: 'python -c "import pyannote.audio"',
-      docs: 'https://github.com/pyannote/pyannote-audio',
-    },
-  },
-  {
     id: 'yt-dlp',
     scanNames: ['yt-dlp'],
     icon: 'yt',
@@ -169,19 +150,23 @@ const TOOLS = [
 
 const CATEGORIES = ['All', 'Installed', 'Not installed']
 
-export default function ToolsPage({ initialTools, onRescan }) {
+export default function ToolsPage({ initialTools, onRescan, isScanning: parentScanning }) {
   const [filter, setFilter] = useState('All')
   const [expanded, setExpanded] = useState(null)
   const [scannedTools, setScannedTools] = useState(initialTools || [])
   const [isScanning, setIsScanning] = useState(false)
+  const [lastScannedAt, setLastScannedAt] = useState(null)
   const [installing, setInstalling] = useState(null)
   const [installLogs, setInstallLogs] = useState({})
+  const [confirmState, setConfirmState] = useState(null)
+
+  const scanning = isScanning || parentScanning
 
   const scan = async () => {
     setIsScanning(true)
     try {
       if (onRescan) await onRescan()
-
+      setLastScannedAt(new Date())
     } catch (err) {
       console.error('Failed to scan tools:', err)
     } finally {
@@ -191,6 +176,7 @@ export default function ToolsPage({ initialTools, onRescan }) {
 
   useEffect(() => {
     setScannedTools(initialTools || [])
+    if (initialTools?.length) setLastScannedAt(new Date())
   }, [initialTools])
 
   // Merge static metadata with scan results
@@ -202,6 +188,7 @@ export default function ToolsPage({ initialTools, onRescan }) {
       installed: scanned ? scanned.available : false,
       version: scanned ? scanned.version : staticTool.version,
       bundled: scanned ? scanned.bundled : staticTool.bundled,
+      whisperModels: scanned?.whisperModels ?? [],
     }
   })
 
@@ -213,12 +200,18 @@ export default function ToolsPage({ initialTools, onRescan }) {
 
   const installedCount = mergedTools.filter(t => t.installed).length
 
-  async function installTool(tool, { confirm = true } = {}) {
+  function requestInstallTool(tool) {
     if (tool.installed || installing) return
-    if (confirm) {
-      const ok = window.confirm(`Install ${tool.name} and its required dependencies?`)
-      if (!ok) return
-    }
+    setConfirmState({
+      type: 'single',
+      tool,
+      title: `Install ${tool.name}?`,
+      message: 'This will run the system installer and may take a few minutes.',
+    })
+  }
+
+  async function runInstallTool(tool) {
+    if (tool.installed || installing) return
 
     setInstalling(tool.id)
     setInstallLogs(prev => ({ ...prev, [tool.id]: 'Starting installer...' }))
@@ -240,35 +233,56 @@ export default function ToolsPage({ initialTools, onRescan }) {
     }
   }
 
-  async function installMissingTools() {
+  function requestInstallMissing() {
     const missing = mergedTools.filter(tool => !tool.installed && tool.id !== 'ffprobe')
     if (missing.length === 0 || installing) return
-    const ok = window.confirm(`Install ${missing.length} missing tool${missing.length === 1 ? '' : 's'}?`)
-    if (!ok) return
+    setConfirmState({
+      type: 'batch',
+      tools: missing,
+      title: `Install ${missing.length} missing tool${missing.length === 1 ? '' : 's'}?`,
+      message: 'Tools will be installed one at a time. Keep this window open until finished.',
+    })
+  }
 
-    for (const tool of missing) {
-      await installTool(tool, { confirm: false })
+  async function handleConfirmInstall() {
+    const state = confirmState
+    setConfirmState(null)
+    if (!state) return
+    if (state.type === 'single') {
+      await runInstallTool(state.tool)
+    } else if (state.type === 'batch') {
+      for (const tool of state.tools) {
+        await runInstallTool(tool)
+      }
     }
   }
 
   return (
     <div className="tools-page">
+      <ConfirmDialog
+        open={!!confirmState}
+        title={confirmState?.title ?? ''}
+        message={confirmState?.message}
+        confirmLabel="Install"
+        onConfirm={handleConfirmInstall}
+        onCancel={() => setConfirmState(null)}
+      />
       <div className="tools-toolbar">
         <span className="tools-title">Tools</span>
         <span className="tools-sub">{installedCount} of {mergedTools.length} installed · agent capabilities depend on what's set up</span>
         <button
           className="install-missing-btn"
-          onClick={installMissingTools}
+          onClick={requestInstallMissing}
           disabled={!!installing || mergedTools.every(t => t.installed || t.id === 'ffprobe')}
         >
           install missing
         </button>
         <button 
-          className={`rescan-btn ${isScanning ? 'scanning' : ''}`} 
+          className={`rescan-btn ${scanning ? 'scanning' : ''}`} 
           onClick={scan}
-          disabled={isScanning}
+          disabled={scanning}
         >
-          {isScanning ? 'scanning...' : 're-scan'}
+          {scanning ? 'scanning...' : 're-scan'}
         </button>
       </div>
 
@@ -295,7 +309,13 @@ export default function ToolsPage({ initialTools, onRescan }) {
           <div className="status-bar">
             <div className="status-dot" />
             <span>ffmpeg, ffprobe, ffplay and yt-dlp are checked for bundled/dev availability</span>
-            <span className="status-right">last scanned just now</span>
+            <span className="status-right">
+              {scanning
+                ? 'scanning tools…'
+                : lastScannedAt
+                ? `last scanned ${lastScannedAt.toLocaleTimeString()}`
+                : 'not scanned yet'}
+            </span>
           </div>
 
           {filtered.map(tool => (
@@ -306,7 +326,7 @@ export default function ToolsPage({ initialTools, onRescan }) {
               onToggle={() => setExpanded(expanded === tool.id ? null : tool.id)}
               installing={installing === tool.id}
               installLog={installLogs[tool.id]}
-              onInstall={() => installTool(tool)}
+              onInstall={() => requestInstallTool(tool)}
             />
           ))}
         </div>
@@ -336,6 +356,11 @@ function ToolCard({ tool, isExpanded, onToggle, installing, installLog, onInstal
             }
           </div>
           <div className="tool-tagline">{tool.tagline}</div>
+          {tool.id === 'whisper' && tool.installed && tool.whisperModels?.length > 0 && (
+            <div className="tool-whisper-summary">
+              {tool.whisperModels.length} model{tool.whisperModels.length === 1 ? '' : 's'}: {tool.whisperModels.join(', ')}
+            </div>
+          )}
           <div className="tool-caps">
             {tool.caps.map(c => (
               <span key={c} className={`cap ${tool.installed ? 'lit' : ''}`}>{c}</span>
@@ -391,6 +416,24 @@ function ToolCard({ tool, isExpanded, onToggle, installing, installLog, onInstal
             ))}
 
             {tool.note && <div className="tool-note">{tool.note}</div>}
+
+            {tool.id === 'whisper' && tool.installed && tool.whisperModels?.length > 0 && (
+              <div className="whisper-models-section">
+                <span className="whisper-models-label">Installed models</span>
+                <div className="whisper-models-list">
+                  {tool.whisperModels.map(model => (
+                    <span key={model} className="whisper-model-pill">{model}</span>
+                  ))}
+                </div>
+                <div className="whisper-models-path">
+                  Cached in <code>~/.cache/whisper/</code>
+                </div>
+              </div>
+            )}
+
+            {tool.id === 'whisper' && tool.installed && !tool.whisperModels?.length && (
+              <div className="tool-note">Whisper is installed. No cached models yet — the first run downloads one (e.g. base).</div>
+            )}
 
             <div className="verify-row">
               <span className="verify-label">Verify:</span>

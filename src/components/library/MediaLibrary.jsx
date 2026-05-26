@@ -57,7 +57,7 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
     const input = document.createElement('input')
     input.type = 'file'
     input.multiple = true
-    input.accept = 'video/*,audio/*,image/*'
+    input.accept = 'video/*,audio/*,image/*,.srt,.vtt,.ass,.ssa,.txt,.md'
     input.onchange = async () => {
       const picked = Array.from(input.files)
       if (!picked.length) return

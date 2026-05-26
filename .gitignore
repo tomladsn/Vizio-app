@@ -6,6 +6,10 @@ jspm_packages/
 dist/
 dist-electron/
 build/
+!build/
+build/*
+!build/icon.ico
+!build/icon.png
 out/
 release/
 resources/bin/

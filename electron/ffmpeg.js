@@ -2,6 +2,7 @@ import { exec, spawn }  from 'child_process'
 import { promisify }    from 'util'
 import path             from 'path'
 import fs               from 'fs'
+import os               from 'os'
 import { app }          from 'electron'
 
 const execAsync = promisify(exec)
@@ -173,18 +174,15 @@ export async function probeFiles(filePaths) {
 
 // ─── Scan installed tools ─────────────────────────────────────────────────────
 export const KNOWN_TOOLS = [
-  { name: 'ffmpeg',  check: BIN.ffmpeg,  flag: '-version',  category: 'Media',    description: 'Video/audio encoding, filtering, trimming, muxing', bundled: true },
-  { name: 'ffprobe', check: BIN.ffprobe, flag: '-version',  category: 'Media',    description: 'Media file inspection and stream analysis', bundled: true },
-  { name: 'ffplay',  check: BIN.ffplay,  flag: '-version',  category: 'Media',    description: 'Media playback and preview', bundled: true },
-  { name: 'yt-dlp',  check: BIN.ytdlp,   flag: '--version', category: 'Download', description: 'Download video/audio from 1000+ sites', bundled: true },
-  { name: 'whisper', check: 'whisper',   flag: '--version', category: 'AI / ML',  description: 'Speech-to-text transcription (OpenAI Whisper)', fallback: 'python -m whisper --version', bundled: false },
+  { name: 'ffmpeg',  category: 'Media',    description: 'Video/audio encoding, filtering, trimming, muxing', bundled: true },
+  { name: 'ffprobe', category: 'Media',    description: 'Media file inspection and stream analysis', bundled: true },
+  { name: 'ffplay',  category: 'Media',    description: 'Media playback and preview', bundled: true },
+  { name: 'yt-dlp',  category: 'Download', description: 'Download video/audio from 1000+ sites', bundled: true },
+  { name: 'whisper', category: 'AI / ML',  description: 'Speech-to-text transcription (OpenAI Whisper)', bundled: false },
   {
     name: 'magick',
-    check: 'magick',
-    flag: '--version',
     category: 'Image',
     description: 'Frame-level image manipulation (ImageMagick)',
-    fallback: 'magick.exe --version',
     bundled: false,
     windowsSearch: {
       baseDirs: ['ProgramFiles', 'ProgramFiles(x86)', 'LOCALAPPDATA'],
@@ -192,8 +190,15 @@ export const KNOWN_TOOLS = [
       exe: 'magick.exe',
     },
   },
-  { name: 'python', check: 'python', flag: '--version', category: 'System', description: 'Python runtime (needed for AI tools like whisper)', bundled: false },
+  { name: 'python', category: 'System', description: 'Python runtime (needed for AI tools like whisper)', bundled: false },
 ]
+
+const SCAN_CACHE_MS = 30_000
+const EXEC_TIMEOUT_MS = 3500
+const FIND_TIMEOUT_MS = 1200
+const WINDOWS_APPS_RE = /WindowsApps/i
+
+let scanCache = null
 
 function matchWindowsDirs(baseDir, patterns) {
   if (!baseDir || !fs.existsSync(baseDir)) return []
@@ -211,63 +216,299 @@ function matchWindowsDirs(baseDir, patterns) {
   }
 }
 
-export async function scanTools() {
-  const isWin = process.platform === 'win32'
+async function execCheck(cmd, timeout = EXEC_TIMEOUT_MS) {
+  try {
+    const { stdout, stderr } = await execAsync(cmd, {
+      timeout,
+      windowsHide: true,
+      maxBuffer: 512 * 1024,
+    })
+    const output = (stdout || stderr || '').trim()
+    if (!output) return { success: false }
+    return { success: true, version: output.split('\n')[0].trim().slice(0, 80) }
+  } catch {
+    return { success: false }
+  }
+}
 
-  const checks = KNOWN_TOOLS.map(async tool => {
-    async function tryCommand(cmd) {
+function quoteCmd(bin) {
+  return bin.includes(' ') ? `"${bin}"` : bin
+}
+
+function listWhisperModels() {
+  const cacheDir = path.join(os.homedir(), '.cache', 'whisper')
+  if (!fs.existsSync(cacheDir)) return []
+  try {
+    return fs.readdirSync(cacheDir)
+      .filter(f => f.endsWith('.pt'))
+      .map(f => f.replace(/\.pt$/i, ''))
+      .sort((a, b) => a.localeCompare(b))
+  } catch {
+    return []
+  }
+}
+
+function discoverPythonPaths() {
+  const found = new Set()
+  const add = (p) => {
+    if (!p || WINDOWS_APPS_RE.test(p) || !fs.existsSync(p)) return
+    if (/\\venv\\|blender|conda|node_modules|pyenv/i.test(p)) return
+    found.add(path.normalize(p))
+  }
+
+  if (process.platform === 'win32') {
+    const roots = [
+      path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python'),
+      path.join(process.env.LOCALAPPDATA || '', 'Python'),
+    ]
+    for (const root of roots) {
+      if (!root || !fs.existsSync(root)) continue
       try {
-        const { stdout, stderr } = await execAsync(cmd, { timeout: 5000 })
-        const output = (stdout || stderr || '').trim()
-        return { success: true, version: output.split('\n')[0].trim().slice(0, 60) }
-      } catch (_) {
-        return { success: false }
-      }
+        for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue
+          const base = path.join(root, entry.name)
+          add(path.join(base, 'python.exe'))
+        }
+      } catch (_) {}
     }
+  }
 
-    // 1. Try primary check
-    let res = await tryCommand(`"${tool.check}" ${tool.flag}`)
-    if (res.success) return { ...tool, available: true, version: res.version }
+  return [...found].slice(0, 4)
+}
 
-    // 2. Try fallback if defined
-    if (tool.fallback) {
-      res = await tryCommand(tool.fallback)
-      if (res.success) return { ...tool, available: true, version: res.version }
-    }
+function discoverScriptsDirs() {
+  const dirs = new Set()
+  if (process.platform !== 'win32') return []
 
-    // 3. Try 'where.exe' (Windows) or 'which' (Unix)
+  for (const py of discoverPythonPaths()) {
+    dirs.add(path.join(path.dirname(py), 'Scripts'))
+  }
+
+  const roots = [
+    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python'),
+    path.join(process.env.LOCALAPPDATA || '', 'Python'),
+  ]
+  for (const root of roots) {
+    if (!root || !fs.existsSync(root)) continue
     try {
-      const findCommands = isWin
-        ? [`where.exe ${tool.name}`, `where.exe ${tool.name}.exe`]
-        : [`which ${tool.name}`]
-
-      for (const findCmd of findCommands) {
-        const { stdout } = await execAsync(findCmd, { timeout: 2000 })
-        if (stdout && stdout.trim()) {
-          return { ...tool, available: true, version: 'available' }
-        }
+      for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue
+        dirs.add(path.join(root, entry.name, 'Scripts'))
       }
-    } catch (findErr) {
-      // find command failed too
+    } catch (_) {}
+  }
+
+  return [...dirs].filter(d => fs.existsSync(d))
+}
+
+async function findWhereExe(name) {
+  if (process.platform !== 'win32') {
+    try {
+      const { stdout } = await execAsync(`which ${name}`, { timeout: FIND_TIMEOUT_MS, windowsHide: true })
+      const hit = stdout.trim().split('\n')[0]?.trim()
+      return hit || null
+    } catch {
+      return null
+    }
+  }
+
+  try {
+    const { stdout } = await execAsync(`where.exe ${name}`, { timeout: FIND_TIMEOUT_MS, windowsHide: true })
+    const hit = stdout.trim().split(/\r?\n/)
+      .map(l => l.trim())
+      .find(l => l && !WINDOWS_APPS_RE.test(l) && fs.existsSync(l))
+    return hit || null
+  } catch {
+    return null
+  }
+}
+
+async function findPythonCandidates(max = 3) {
+  const candidates = []
+  const seen = new Set()
+
+  function push(cmd, version) {
+    if (seen.has(cmd) || candidates.length >= max) return
+    seen.add(cmd)
+    candidates.push({ cmd, version })
+  }
+
+  const fsHits = await Promise.all(
+    discoverPythonPaths().map(async pyPath => {
+      const cmd = quoteCmd(pyPath)
+      const res = await execCheck(`${cmd} --version`, 2500)
+      return res.success ? { cmd, version: res.version } : null
+    })
+  )
+  for (const hit of fsHits) if (hit) push(hit.cmd, hit.version)
+  if (candidates.length >= max) return candidates
+
+  if (process.platform === 'win32') {
+    for (const launcher of ['py -3', 'py']) {
+      if (candidates.length >= max) break
+      const res = await execCheck(`${launcher} --version`, 2500)
+      if (res.success) push(launcher, res.version)
+    }
+  } else {
+    for (const name of ['python3', 'python']) {
+      if (candidates.length >= max) break
+      const res = await execCheck(`${name} --version`, 2500)
+      if (res.success) push(name, res.version)
+    }
+  }
+
+  return candidates
+}
+
+async function detectBundledBin(binPath, flag, toolKey) {
+  const systemCmd = toolKey === 'ytdlp' ? 'yt-dlp' : toolKey
+  const bundled = binPath !== systemCmd
+  const res = await execCheck(`${quoteCmd(binPath)} ${flag}`)
+  return res.success
+    ? { available: true, version: res.version, bundled }
+    : { available: false, version: null, bundled: false }
+}
+
+async function detectYtDlp(pythonCandidates) {
+  const bundledRes = await detectBundledBin(BIN.ytdlp, '--version', 'ytdlp')
+  if (bundledRes.available) return bundledRes
+
+  const whereHit = await findWhereExe('yt-dlp')
+  if (whereHit) {
+    const res = await execCheck(`${quoteCmd(whereHit)} --version`)
+    if (res.success) return { ...res, available: true, bundled: false }
+  }
+
+  for (const scriptsDir of discoverScriptsDirs()) {
+    const exe = path.join(scriptsDir, 'yt-dlp.exe')
+    if (!fs.existsSync(exe)) continue
+    const res = await execCheck(`${quoteCmd(exe)} --version`)
+    if (res.success) return { ...res, available: true, bundled: false }
+  }
+
+  for (const { cmd } of pythonCandidates.slice(0, 2)) {
+    const res = await execCheck(`${cmd} -m yt_dlp --version`)
+    if (res.success) return { ...res, available: true, bundled: false }
+  }
+
+  return { available: false, version: null, bundled: false }
+}
+
+async function detectWhisper(pythonCandidates) {
+  const whisperModels = listWhisperModels()
+
+  if (whisperModels.length > 0) {
+    const cmd = pythonCandidates[0]?.cmd
+    if (cmd) {
+      const res = await execCheck(`${cmd} -c "import whisper; print(whisper.__version__)"`, 3000)
+      if (res.success) {
+        return { available: true, version: res.version, bundled: false, whisperModels }
+      }
+    }
+    return {
+      available: true,
+      version: `${whisperModels.length} model(s) cached`,
+      bundled: false,
+      whisperModels,
+    }
+  }
+
+  const whereHit = await findWhereExe('whisper')
+  if (whereHit) {
+    const res = await execCheck(`${quoteCmd(whereHit)} --help`, 2500)
+    if (res.success) {
+      return { available: true, version: res.version || 'installed', bundled: false, whisperModels }
+    }
+  }
+
+  for (const scriptsDir of discoverScriptsDirs()) {
+    const exe = path.join(scriptsDir, 'whisper.exe')
+    if (!fs.existsSync(exe)) continue
+    const res = await execCheck(`${quoteCmd(exe)} --help`, 2500)
+    if (res.success) {
+      return { available: true, version: res.version || 'installed', bundled: false, whisperModels }
+    }
+  }
+
+  for (const { cmd } of pythonCandidates.slice(0, 1)) {
+    const res = await execCheck(`${cmd} -c "import whisper; print(whisper.__version__)"`, 6000)
+    if (res.success) {
+      return { available: true, version: res.version, bundled: false, whisperModels }
+    }
+  }
+
+  return { available: false, version: null, bundled: false, whisperModels: [] }
+}
+
+async function detectMagick(isWin, meta) {
+  for (const cmd of ['magick', 'magick.exe']) {
+    const res = await execCheck(`${cmd} --version`)
+    if (res.success) return { ...res, available: true, bundled: false }
+  }
+
+  if (isWin && meta.windowsSearch) {
+    const candidates = meta.windowsSearch.baseDirs.flatMap(envName =>
+      matchWindowsDirs(process.env[envName], meta.windowsSearch.subdirs)
+    )
+    for (const dir of candidates) {
+      const exePath = path.join(dir, meta.windowsSearch.exe)
+      if (fs.existsSync(exePath)) {
+        return { available: true, version: path.basename(dir), bundled: false }
+      }
+    }
+  }
+
+  return { available: false, version: null, bundled: false }
+}
+
+export async function scanTools({ force = false } = {}) {
+  if (!force && scanCache && Date.now() - scanCache.at < SCAN_CACHE_MS) {
+    return scanCache.tools
+  }
+
+  const isWin = process.platform === 'win32'
+  const pythonCandidates = await findPythonCandidates()
+
+  const checks = KNOWN_TOOLS.map(async meta => {
+    const base = { ...meta, available: false, version: null }
+
+    if (meta.name === 'ffmpeg') {
+      const det = await detectBundledBin(BIN.ffmpeg, '-version', 'ffmpeg')
+      return { ...base, ...det, bundled: det.bundled ?? true }
+    }
+    if (meta.name === 'ffprobe') {
+      const det = await detectBundledBin(BIN.ffprobe, '-version', 'ffprobe')
+      return { ...base, ...det, bundled: det.bundled ?? true }
+    }
+    if (meta.name === 'ffplay') {
+      const det = await detectBundledBin(BIN.ffplay, '-version', 'ffplay')
+      return { ...base, ...det, bundled: det.bundled ?? true }
+    }
+    if (meta.name === 'python') {
+      if (pythonCandidates.length === 0) return base
+      const count = pythonCandidates.length
+      const label = count > 1 ? `${pythonCandidates[0].version} (+${count - 1} more)` : pythonCandidates[0].version
+      return { ...base, available: true, version: label, bundled: false }
+    }
+    if (meta.name === 'yt-dlp') {
+      const det = await detectYtDlp(pythonCandidates)
+      return { ...base, ...det }
+    }
+    if (meta.name === 'whisper') {
+      const det = await detectWhisper(pythonCandidates)
+      return { ...base, ...det }
+    }
+    if (meta.name === 'magick') {
+      const det = await detectMagick(isWin, meta)
+      return { ...base, ...det }
     }
 
-    // 4. Try common Windows install folders for tools that ship outside PATH
-    if (isWin && tool.windowsSearch) {
-      const candidates = tool.windowsSearch.baseDirs.flatMap(envName =>
-        matchWindowsDirs(process.env[envName], tool.windowsSearch.subdirs)
-      )
-
-      for (const dir of candidates) {
-        const exePath = path.join(dir, tool.windowsSearch.exe)
-        if (fs.existsSync(exePath)) {
-          return { ...tool, available: true, version: exePath }
-        }
-      }
-    }
-
-    return { ...tool, available: false, version: null }
+    return base
   })
-  return Promise.all(checks)
+
+  const tools = await Promise.all(checks)
+  scanCache = { at: Date.now(), tools }
+  return tools
 }
 
 export function formatToolsBlock(results) {
@@ -279,7 +520,10 @@ export function formatToolsBlock(results) {
     lines.push(`### ${cat}`)
     for (const t of results.filter(x => x.category === cat)) {
       const icon    = t.available ? '✅' : '❌'
-      const version = t.available ? `  [${t.version}]` : '  not installed'
+      let version = t.available ? `  [${t.version}]` : '  not installed'
+      if (t.name === 'whisper' && t.whisperModels?.length) {
+        version += `  [models: ${t.whisperModels.join(', ')}]`
+      }
       lines.push(`  ${icon} ${t.name.padEnd(14)} — ${t.description}${version}`)
     }
     lines.push('')
@@ -288,6 +532,11 @@ export function formatToolsBlock(results) {
   const available = results.filter(t => t.available).map(t => t.name).join(', ')
   lines.push(`Usable tools this session: ${available}`)
   return lines.join('\n')
+}
+
+export async function scanToolsWithBlock({ force = false } = {}) {
+  const tools = await scanTools({ force })
+  return { tools, block: formatToolsBlock(tools) }
 }
 
 // ─── Logger (Electron version) ────────────────────────────────────────────────

@@ -31,19 +31,19 @@
   "build": {
     "appId": "com.vizio.app",
     "productName": "Vizio",
-    "copyright": "Copyright © 2024 Vizio",
+    "copyright": "Copyright (c) 2024 Vizio",
     "directories": {
-      "output": "dist-electron"
+      "output": "dist-electron",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "package.json",
-      "icon.png"
+      "build/**/*",
+      "package.json"
     ],
-    "icon": "icon.png",
     "win": {
-      "signAndEditExecutable": false,
+      "icon": "build/icon.ico",
       "extraResources": [
         {
           "from": "resources/bin/win32",
@@ -88,6 +88,9 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
       "artifactName": "${productName}-Setup-${version}.${ext}"
     }
   }

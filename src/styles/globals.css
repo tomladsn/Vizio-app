@@ -25,11 +25,11 @@
   --text-muted:     rgba(210,232,249,0.46);
   --text-hint:      rgba(210,232,249,0.28);
 
-  --accent:         #4BB8FF;
-  --accent-rgb:     75,184,255;
+  --accent:         #5d2441;
+  --accent-rgb:     93,36,65;
   --accent-dim:     rgba(var(--accent-rgb),0.15);
   --accent-border:  rgba(var(--accent-rgb),0.28);
-  --accent-text:    #9EDCFF;
+  --accent-text:    #D88AB2;
 
   /* backwards compatibility for existing styles */
   --green:          var(--accent);
@@ -68,7 +68,7 @@
   --bg-raised:      #07101a;
   --bg-overlay:     #0b1b2a;
   --app-backdrop:
-    linear-gradient(135deg, rgba(75,184,255,0.06), transparent 30%),
+    linear-gradient(135deg, rgba(var(--accent-rgb),0.06), transparent 30%),
     linear-gradient(215deg, rgba(142,69,216,0.08), transparent 34%),
     var(--bg-base);
   --toolbar-bg:     linear-gradient(180deg, rgba(11,27,42,0.98), rgba(0,0,0,0.98));
@@ -80,7 +80,7 @@
   --bg-raised:      #1a2634;
   --bg-overlay:     #22334a;
   --app-backdrop:
-    linear-gradient(135deg, rgba(75,184,255,0.08), transparent 36%),
+    linear-gradient(135deg, rgba(var(--accent-rgb),0.08), transparent 36%),
     linear-gradient(215deg, rgba(142,69,216,0.08), transparent 38%),
     var(--bg-base);
   --toolbar-bg:     linear-gradient(180deg, rgba(34,51,74,0.95), rgba(21,29,40,0.95));
@@ -93,7 +93,7 @@
   --bg-overlay:     #e2eef8;
   --bg-input:       rgba(8,31,50,0.045);
   --app-backdrop:
-    linear-gradient(135deg, rgba(75,184,255,0.18), transparent 32%),
+    linear-gradient(135deg, rgba(var(--accent-rgb),0.18), transparent 32%),
     linear-gradient(215deg, rgba(142,69,216,0.12), transparent 34%),
     var(--bg-base);
   --surface-gradient: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(226,238,248,0.72));
@@ -116,7 +116,7 @@
   --bg-overlay:     #e9edf2;
   --bg-input:       rgba(30,39,55,0.045);
   --app-backdrop:
-    linear-gradient(135deg, rgba(75,184,255,0.12), transparent 35%),
+    linear-gradient(135deg, rgba(var(--accent-rgb),0.12), transparent 35%),
     linear-gradient(215deg, rgba(142,69,216,0.10), transparent 38%),
     var(--bg-base);
   --surface-gradient: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(244,241,237,0.72));
@@ -139,7 +139,7 @@
   --bg-overlay:     #eef3f8;
   --bg-input:       rgba(15,33,48,0.045);
   --app-backdrop:
-    linear-gradient(135deg, rgba(75,184,255,0.11), transparent 30%),
+    linear-gradient(135deg, rgba(var(--accent-rgb),0.11), transparent 30%),
     linear-gradient(215deg, rgba(142,69,216,0.08), transparent 34%),
     var(--bg-base);
   --surface-gradient: linear-gradient(180deg, rgba(255,255,255,1), rgba(238,243,248,0.66));
@@ -156,11 +156,11 @@
 }
 
 [data-accent="vizio"] {
-  --accent:         #4BB8FF;
-  --accent-rgb:     75,184,255;
+  --accent:         #5d2441;
+  --accent-rgb:     93,36,65;
   --accent-dim:     rgba(var(--accent-rgb),0.15);
   --accent-border:  rgba(var(--accent-rgb),0.28);
-  --accent-text:    #9EDCFF;
+  --accent-text:    #D88AB2;
 }
 
 [data-accent="green"] {
@@ -220,10 +220,13 @@
 }
 
 [data-theme="frost"][data-accent="vizio"],
-[data-theme="frost"][data-accent="blue"],
 [data-theme="pearl"][data-accent="vizio"],
+[data-theme="day"][data-accent="vizio"] {
+  --accent-text:    #5d2441;
+}
+
+[data-theme="frost"][data-accent="blue"],
 [data-theme="pearl"][data-accent="blue"],
-[data-theme="day"][data-accent="vizio"],
 [data-theme="day"][data-accent="blue"] {
   --accent-text:    #075985;
 }

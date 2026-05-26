@@ -2,8 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electron', {
   // Tool scanning
-  scanTools: () =>
-    ipcRenderer.invoke('tools:scan'),
+  scanTools: (opts) =>
+    ipcRenderer.invoke('tools:scan', opts),
   installTool: (toolId) =>
     ipcRenderer.invoke('tools:install', toolId),
   scanToolsBlock: () =>
@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('electron', {
   // File probing via ffprobe
   probeFiles: (filePaths) =>
     ipcRenderer.invoke('files:probe', filePaths),
+  readFilesBase64: (filePaths) =>
+    ipcRenderer.invoke('files:readBase64', filePaths),
 
   // Workflow execution — called as runWorkflow(payload)
   runWorkflow: (payload) =>
@@ -25,8 +27,8 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('session:init', payload),
   readSessionLog: (sessionId) =>
     ipcRenderer.invoke('session:readLog', sessionId),
-  listSessionFiles: (sessionId) =>
-    ipcRenderer.invoke('session:listFiles', sessionId),
+  listSessionFiles: (sessionId, projectDir) =>
+    ipcRenderer.invoke('session:listFiles', { sessionId, projectDir }),
 
   // File opening
   openFile: (filePath) =>
@@ -42,6 +44,7 @@ contextBridge.exposeInMainWorld('electron', {
     getAll:      ()                         => ipcRenderer.invoke('project:getAll'),
     create:      (data)                     => ipcRenderer.invoke('project:create', data),
     setLast:     (id)                       => ipcRenderer.invoke('project:setLast', id),
+    delete:      (id)                       => ipcRenderer.invoke('project:delete', id),
     getMedia:    (projectDir)               => ipcRenderer.invoke('project:getMedia', projectDir),
     getOutputs:  (projectDir)               => ipcRenderer.invoke('project:getOutputs', projectDir),
     copyMedia:   (sourcePath, projectDir)   => ipcRenderer.invoke('project:copyMedia', { sourcePath, projectDir }),
@@ -93,5 +96,27 @@ contextBridge.exposeInMainWorld('electron', {
     moveFile:   (projectDir, srcPath, destPath)   => ipcRenderer.invoke('agent:moveFile',   { projectDir, srcPath, destPath }),
     readText:   (projectDir, filePath)            => ipcRenderer.invoke('agent:readText',   { projectDir, filePath }),
     writeText:  (projectDir, filePath, content)   => ipcRenderer.invoke('agent:writeText',  { projectDir, filePath, content }),
+  },
+
+  // Secure key store — plaintext keys are encrypted by the OS and never leave the main process
+  keys: {
+    set:      (keyId, value) => ipcRenderer.invoke('keys:set',      { keyId, value }),
+    getHint:  (keyId)        => ipcRenderer.invoke('keys:getHint',  keyId),
+    has:      (keyId)        => ipcRenderer.invoke('keys:has',      keyId),
+    listSet:  ()             => ipcRenderer.invoke('keys:listSet'),
+    delete:   (keyId)        => ipcRenderer.invoke('keys:delete',   keyId),
+    migrate:  (legacyKeys)   => ipcRenderer.invoke('keys:migrate',  legacyKeys),
+  },
+
+  // AI — all provider calls run in main; keys never sent from renderer
+  ai: {
+    complete: (payload) => ipcRenderer.invoke('ai:complete', payload),
+    startStream: (payload) => ipcRenderer.invoke('ai:streamStart', payload),
+    abortStream: (requestId) => ipcRenderer.invoke('ai:streamAbort', requestId),
+    onStream: (channel, cb) => {
+      const fn = (_, data) => cb(data)
+      ipcRenderer.on(channel, fn)
+      return () => ipcRenderer.removeListener(channel, fn)
+    },
   },
 })

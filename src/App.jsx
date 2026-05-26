@@ -4,7 +4,7 @@ import MainPage    from './pages/MainPage'
 import ToolsPage   from './pages/ToolsPage'
 import SettingsPage from './pages/SettingsPage'
 import MenuBar      from './components/layout/MenuBar'
-import { settingsStore } from './store/settingsStore'
+import { settingsStore, collectLegacyApiKeys } from './store/settingsStore'
 import './styles/globals.css'
 import './App.css'
 
@@ -20,9 +20,9 @@ export default function App() {
   const [activeChatId, setActiveChatId] = useState(null)
 
   const [settings, setSettings] = useState(settingsStore.get())
-  const [appLoading, setAppLoading] = useState(true)
   const [scannedTools, setScannedTools] = useState([])
   const [toolsBlock, setToolsBlock] = useState('')
+  const [toolsScanning, setToolsScanning] = useState(true)
 
   // ── Global drag-and-drop ─────────────────────────────────────────────────
   const [globalDragging, setGlobalDragging] = useState(false)
@@ -31,21 +31,34 @@ export default function App() {
   const libraryReloadRef = useRef(null)   // set by MainPage
 
   useEffect(() => {
-    async function initialScan() {
+    let cancelled = false
+
+    async function migrateLegacyKeys() {
+      const legacyKeys = collectLegacyApiKeys()
+      if (Object.keys(legacyKeys).length === 0) return
+      await window.electron.keys.migrate(legacyKeys)
+      const cleaned = settingsStore.get()
+      settingsStore.save(cleaned)
+      settingsStore.notifyKeysUpdated()
+    }
+
+    async function scanToolsInBackground() {
+      setToolsScanning(true)
       try {
-        const [block, tools] = await Promise.all([
-          window.electron.scanToolsBlock(),
-          window.electron.scanTools()
-        ])
-        setToolsBlock(block)
+        const { tools, block } = await window.electron.scanTools()
+        if (cancelled) return
         setScannedTools(tools)
+        setToolsBlock(block)
       } catch (e) {
         console.error('Scan failed', e)
       } finally {
-        setAppLoading(false)
+        if (!cancelled) setToolsScanning(false)
       }
     }
-    initialScan()
+
+    migrateLegacyKeys().catch(e => console.error('Key migration failed', e))
+    scanToolsInBackground()
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -124,20 +137,6 @@ export default function App() {
     setHistIdx(idx); setPage(history[idx])
   }
 
-  // Show gate until a project is selected/created
-  if (appLoading) {
-    return (
-      <div className="gate-overlay">
-        <div className="gate-card" style={{ alignItems: 'center', justifyContent: 'center', padding: '60px' }}>
-          <img src="/src/assets/logo.png" className="gate-logo-img" alt="Vizio" style={{ width: 80, height: 80, marginBottom: 20 }} />
-          <div className="gate-title">Starting Vizio...</div>
-          <div className="gate-subtitle">Scanning system for media tools</div>
-          <div className="gate-spinner" style={{ marginTop: 20 }} />
-        </div>
-      </div>
-    )
-  }
-
   if (!project) return <ProjectGate onProjectReady={setProject} />
 
   return (
@@ -193,13 +192,11 @@ export default function App() {
           />
         </div>
         <div style={{ display: page === 'tools' ? 'contents' : 'none' }}>
-          <ToolsPage 
+          <ToolsPage
             initialTools={scannedTools}
+            isScanning={toolsScanning}
             onRescan={async () => {
-              const [block, tools] = await Promise.all([
-                window.electron.scanToolsBlock(),
-                window.electron.scanTools()
-              ])
+              const { tools, block } = await window.electron.scanTools({ force: true })
               setToolsBlock(block)
               setScannedTools(tools)
             }}

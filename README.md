@@ -105,7 +105,6 @@ The **Tools** page detects and (on Windows) auto-installs all of these:
 | **OpenAI Whisper** | Speech-to-text, subtitles (SRT/VTT) | `pip install openai-whisper` |
 | **yt-dlp** | Download from YouTube & 1000+ sites | `pip install yt-dlp` |
 | **ImageMagick** | Frame-level image manipulation | `winget install ImageMagick.ImageMagick` |
-| **pyannote** | Speaker diarization (requires HF token) | `pip install pyannote.audio` |
 
 ---
 

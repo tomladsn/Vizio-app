@@ -3,7 +3,16 @@ import path from 'path'
 import { app } from 'electron'
 
 const PROJECTS_INDEX = path.join(app.getPath('userData'), 'projects.json')
-const MEDIA_EXTS = new Set(['.mp4', '.mov', '.avi', '.mkv', '.webm', '.mp3', '.wav', '.flac', '.aac', '.m4a', '.png', '.jpg', '.jpeg', '.webp', '.gif'])
+const MEDIA_EXTS = new Set([
+  // Video
+  '.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v', '.wmv', '.flv', '.mpeg', '.mpg',
+  // Audio
+  '.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg', '.opus', '.wma',
+  // Images
+  '.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp', '.tiff', '.svg',
+  // Subtitles / transcripts / text sidecars
+  '.srt', '.vtt', '.ass', '.ssa', '.txt', '.md',
+])
 const SKIP_DIRS = new Set(['chats', 'sessions'])
 
 function loadIndex() {
@@ -57,6 +66,27 @@ export function setLastProject(id) {
   const index = loadIndex()
   index.lastProjectId = id
   saveIndex(index)
+}
+
+export function deleteProject(id) {
+  const index = loadIndex()
+  const project = index.projects.find(p => p.id === id)
+  if (!project) return { ok: false, message: 'Project not found.' }
+
+  try {
+    if (fs.existsSync(project.folderPath)) {
+      fs.rmSync(project.folderPath, { recursive: true, force: true })
+    }
+  } catch (err) {
+    return { ok: false, message: err.message || 'Failed to delete project folder.' }
+  }
+
+  index.projects = index.projects.filter(p => p.id !== id)
+  if (index.lastProjectId === id) {
+    index.lastProjectId = index.projects[0]?.id ?? null
+  }
+  saveIndex(index)
+  return { ok: true }
 }
 
 function formatProjectFile(fullPath, stat) {

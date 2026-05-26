@@ -216,6 +216,13 @@
   margin-top: 2px;
 }
 
+.tool-whisper-summary {
+  font-size: 10px;
+  color: var(--accent-text);
+  font-family: var(--font-mono);
+  margin-top: 4px;
+}
+
 .tool-caps {
   display: flex;
   flex-wrap: wrap;
@@ -443,6 +450,52 @@
   color: var(--text-muted);
   font-style: italic;
   line-height: 1.5;
+}
+
+.whisper-models-section {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg-base);
+  border: 0.5px solid var(--border);
+}
+
+.whisper-models-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.whisper-models-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.whisper-model-pill {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--accent-dim);
+  color: var(--accent-text);
+  border: 0.5px solid var(--accent-border);
+  font-family: var(--font-mono);
+}
+
+.whisper-models-path {
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.whisper-models-path code {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
 }
 
 .installed-note {

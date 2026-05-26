@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react'
+import ConfirmDialog from '../ui/ConfirmDialog'
 import './ProjectGate.css'
+import logo from '../../assets/logo.png'
+import { initBgAnimation } from '../../lib/bgAnimation'
 
 export default function ProjectGate({ onProjectReady }) {
   const [screen,    setScreen]    = useState('loading') // loading | choose | create | new
@@ -7,7 +10,9 @@ export default function ProjectGate({ onProjectReady }) {
   const [name,      setName]      = useState('')
   const [folder,    setFolder]    = useState('')
   const [creating,  setCreating]  = useState(false)
+  const [deleting,  setDeleting]  = useState(false)
   const [error,     setError]     = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(null)
 
   useEffect(() => {
     window.electron.project.getAll().then(({ projects, lastProjectId }) => {
@@ -18,6 +23,15 @@ export default function ProjectGate({ onProjectReady }) {
         setScreen('choose')
       }
     })
+  }, [])
+
+  useEffect(() => {
+    // Initialize background animation with accent color
+    const accentRgb = getComputedStyle(document.documentElement).getPropertyValue('--accent-rgb').trim()
+    const cleanup = initBgAnimation('gate-bg-canvas', accentRgb)
+    return () => {
+      if (cleanup) cleanup()
+    }
   }, [])
 
   async function handleChoosePath() {
@@ -44,34 +58,98 @@ export default function ProjectGate({ onProjectReady }) {
     onProjectReady(project)
   }
 
+  async function handleDeleteConfirm() {
+    const project = confirmDelete
+    if (!project) return
+    setConfirmDelete(null)
+    setDeleting(true)
+    setError('')
+    try {
+      const result = await window.electron.project.delete(project.id)
+      if (!result?.ok) {
+        setError(result?.message ?? 'Failed to delete project.')
+        return
+      }
+      const remaining = projects.filter(p => p.id !== project.id)
+      setProjects(remaining)
+      if (remaining.length === 0) setScreen('create')
+    } catch (e) {
+      setError(e.message ?? 'Failed to delete project.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (screen === 'loading') return (
     <div className="gate-overlay">
+      <canvas id="gate-bg-canvas" />
       <div className="gate-spinner" />
     </div>
   )
 
   return (
     <div className="gate-overlay">
+      <canvas id="gate-bg-canvas" />
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete project?"
+        message={
+          confirmDelete ? (
+            <>
+              &ldquo;{confirmDelete.name}&rdquo; will be removed from Vizio and all files in its
+              folder will be permanently deleted.
+              <br />
+              <code className="gate-delete-path">{confirmDelete.folderPath}</code>
+            </>
+          ) : null
+        }
+        confirmLabel="Delete"
+        danger
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setConfirmDelete(null)}
+      />
       <div className="gate-card">
-        <img src="/src/assets/logo.png" className="gate-logo-img" alt="Vizio" />
+        <img src={logo} className="gate-logo-img" alt="Vizio" />
 
         {screen === 'choose' && (
           <>
             <div className="gate-title">Welcome back</div>
             <div className="gate-subtitle">Open a recent project or start a new one</div>
 
+            {error && <div className="gate-error">{error}</div>}
+
             <div className="gate-projects">
               {projects.map(p => (
-                <button key={p.id} className="gate-project-row" onClick={() => handleOpen(p)}>
-                  <div className="gpr-icon">
-                    <img src="/src/assets/logo.png" alt="" />
-                  </div>
-                  <div className="gpr-info">
-                    <div className="gpr-name">{p.name}</div>
-                    <div className="gpr-path">{p.folderPath}</div>
-                  </div>
-                  <div className="gpr-arrow">→</div>
-                </button>
+                <div key={p.id} className="gate-project-row">
+                  <button
+                    type="button"
+                    className="gpr-open"
+                    onClick={() => handleOpen(p)}
+                    disabled={deleting}
+                  >
+                    <div className="gpr-icon">
+                      <img src={logo} alt="" />
+                    </div>
+                    <div className="gpr-info">
+                      <div className="gpr-name">{p.name}</div>
+                      <div className="gpr-path">{p.folderPath}</div>
+                    </div>
+                    <div className="gpr-arrow">→</div>
+                  </button>
+                  <button
+                    type="button"
+                    className="gpr-delete"
+                    title="Delete project"
+                    aria-label={`Delete ${p.name}`}
+                    disabled={deleting}
+                    onClick={() => {
+                      setError('')
+                      setConfirmDelete(p)
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
               ))}
             </div>
 

@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { settingsStore, PROVIDERS, ACCENTS, THEMES, FONT_PRESETS, MODEL_HINTS, MODEL_PRESETS } from '../store/settingsStore'
+import { useSecureKeys } from '../hooks/useSecureKeys'
 import './SettingsPage.css'
 
 export default function SettingsPage() {
@@ -61,16 +62,17 @@ export default function SettingsPage() {
 // ─── API Tab ──────────────────────────────────────────────────────────────────
 function ApiTab({ settings, shown, onToggleShow, onUpdate }) {
   const activeProvider = settings.activeProvider
+  const { hasKeyForProvider } = useSecureKeys()
 
   return (
     <>
-      {/* Provider selector */}
+
       <section className="settings-section">
         <div className="section-title">Active provider</div>
-        <p className="section-desc">Pick which AI backend powers the agent. Configure keys and models below.</p>
+        <p className="section-desc">Select your preferred model provider. Configure keys and models below.</p>
         <div className="provider-tabs">
           {PROVIDERS.map(p => {
-            const hasKey = p.requiresKey ? !!settings[`${p.id}ApiKey`]?.trim() : true
+            const hasKey = p.requiresKey ? hasKeyForProvider(p.id) : true
             const hasModel = !!settings[`${p.id}Model`]?.trim()
             const isReady = hasKey && hasModel
             return (
@@ -105,16 +107,67 @@ function ApiTab({ settings, shown, onToggleShow, onUpdate }) {
   )
 }
 
-function ProviderConfig({ provider, settings, shown, onToggleShow, onUpdate }) {
+function ProviderConfig({ provider, settings, onUpdate }) {
   const pid = provider.id
   const hints = MODEL_HINTS[pid]
   const presets = MODEL_PRESETS[pid] ?? []
-  const apiKey = settings[`${pid}ApiKey`] ?? ''
   const model = settings[`${pid}Model`] ?? ''
   const temperature = settings[`${pid}Temperature`] ?? 0.2
   const maxTokens = settings[`${pid}MaxTokens`] ?? 700
-  const hasKey = !!apiKey.trim()
   const hasModel = !!model.trim()
+
+  // ── Secure key state ──────────────────────────────────────────────────────
+  // keyDraft  = what the user is currently typing (never persisted)
+  // keyHint   = masked display string loaded from encrypted store ("••••••••3f2a")
+  // keyExists = whether a key is saved in the encrypted store
+  const [keyDraft,   setKeyDraft]   = useState('')
+  const [keyHint,    setKeyHint]    = useState('')
+  const [keyExists,  setKeyExists]  = useState(false)
+  const [showDraft,  setShowDraft]  = useState(false)
+  const [keySaving,  setKeySaving]  = useState(false)
+  const [keyMsg,     setKeyMsg]     = useState(null) // { ok, text }
+
+  const keyId = pid + 'ApiKey'
+
+  useEffect(() => {
+    if (!provider.requiresKey) return
+    window.electron.keys.getHint(keyId).then(res => {
+      setKeyExists(res.exists)
+      setKeyHint(res.hint)
+    })
+  }, [keyId, provider.requiresKey])
+
+  async function handleSaveKey() {
+    if (!keyDraft.trim()) return
+    setKeySaving(true)
+    setKeyMsg(null)
+    const res = await window.electron.keys.set(keyId, keyDraft.trim())
+    if (res.ok) {
+      const hint = await window.electron.keys.getHint(keyId)
+      setKeyExists(hint.exists)
+      setKeyHint(hint.hint)
+      setKeyDraft('')   // discard the draft immediately
+      setShowDraft(false)
+      setKeyMsg({ ok: true, text: 'Key saved and encrypted.' })
+      settingsStore.notifyKeysUpdated()
+    } else {
+      setKeyMsg({ ok: false, text: res.message || 'Failed to save key.' })
+    }
+    setKeySaving(false)
+    setTimeout(() => setKeyMsg(null), 3000)
+  }
+
+  async function handleClearKey() {
+    setKeySaving(true)
+    await window.electron.keys.delete(keyId)
+    setKeyExists(false)
+    setKeyHint('')
+    setKeyDraft('')
+    setKeySaving(false)
+    setKeyMsg({ ok: true, text: 'Key removed.' })
+    settingsStore.notifyKeysUpdated()
+    setTimeout(() => setKeyMsg(null), 2000)
+  }
 
   return (
     <>
@@ -136,23 +189,70 @@ function ProviderConfig({ provider, settings, shown, onToggleShow, onUpdate }) {
               <div className="key-label">API key</div>
               <div className="key-env">{provider.envKey}</div>
             </div>
-            <div className="key-input-wrap">
-              <input
-                type={shown ? 'text' : 'password'}
-                className="key-input"
-                placeholder={provider.keyPlaceholder}
-                value={apiKey}
-                onChange={e => onUpdate(`${pid}ApiKey`, e.target.value)}
-              />
-              <button className="reveal-btn" onClick={onToggleShow}>
-                {shown ? 'hide' : 'show'}
-              </button>
-            </div>
-            <div className={`key-status ${hasKey ? 'ok' : 'empty'}`}>
-              {hasKey
-                ? <><div className="key-dot" /><span>set</span></>
-                : <span>not set</span>
-              }
+
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Current status */}
+              {keyExists && !keyDraft && (
+                <div className="key-saved-row">
+                  <div className="key-status ok">
+                    <div className="key-dot" />
+                    <span className="key-hint-text">{keyHint}</span>
+                  </div>
+                  <button
+                    className="reveal-btn"
+                    onClick={() => { setShowDraft(true); setKeyDraft('') }}
+                  >
+                    replace
+                  </button>
+                  <button
+                    className="reveal-btn danger"
+                    onClick={handleClearKey}
+                    disabled={keySaving}
+                  >
+                    clear
+                  </button>
+                </div>
+              )}
+
+              {/* Input for new key */}
+              {(!keyExists || keyDraft || showDraft) && (
+                <div className="key-input-wrap">
+                  <input
+                    type={showDraft ? 'text' : 'password'}
+                    className="key-input"
+                    placeholder={keyExists ? 'Enter new key to replace…' : provider.keyPlaceholder}
+                    value={keyDraft}
+                    onChange={e => setKeyDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSaveKey() }}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <button className="reveal-btn" onClick={() => setShowDraft(s => !s)}>
+                    {showDraft ? 'hide' : 'show'}
+                  </button>
+                  <button
+                    className="save-btn"
+                    style={{ padding: '4px 12px', fontSize: 11 }}
+                    onClick={handleSaveKey}
+                    disabled={keySaving || !keyDraft.trim()}
+                  >
+                    {keySaving ? 'saving…' : 'save key'}
+                  </button>
+                  {keyExists && (
+                    <button className="reveal-btn" onClick={() => { setKeyDraft(''); setShowDraft(false) }}>
+                      cancel
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {keyMsg && (
+                <div className={`key-msg ${keyMsg.ok ? 'ok' : 'err'}`}>{keyMsg.text}</div>
+              )}
+
+              {!keyExists && !keyDraft && (
+                <div className="key-status empty"><span>not set — key will be encrypted on save</span></div>
+              )}
             </div>
           </div>
         </section>
@@ -239,9 +339,7 @@ function ProviderConfig({ provider, settings, shown, onToggleShow, onUpdate }) {
             <label className="field-label">Temperature</label>
             <input
               type="number"
-              min="0"
-              max="2"
-              step="0.1"
+              min="0" max="2" step="0.1"
               className="key-input"
               value={temperature}
               onChange={e => onUpdate(`${pid}Temperature`, Number(e.target.value))}
@@ -253,9 +351,7 @@ function ProviderConfig({ provider, settings, shown, onToggleShow, onUpdate }) {
             <label className="field-label">Max tokens</label>
             <input
               type="number"
-              min="100"
-              max="8192"
-              step="100"
+              min="100" max="8192" step="100"
               className="key-input"
               value={maxTokens}
               onChange={e => onUpdate(`${pid}MaxTokens`, Number(e.target.value))}

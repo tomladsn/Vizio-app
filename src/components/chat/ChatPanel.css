@@ -33,6 +33,41 @@
 .chat-empty-text { font-size: 15px; font-weight: 500; color: var(--text-secondary); }
 .chat-empty-sub  { font-size: 12px; color: var(--text-muted); }
 
+.task-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
+  max-width: 360px;
+}
+
+.task-preset-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 0.5px solid var(--border-mid);
+  background: var(--bg-overlay);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.task-preset-chip:hover:not(:disabled) {
+  background: var(--accent-dim, rgba(75, 184, 255, 0.12));
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.task-preset-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.msg.ai .bubble.streaming {
+  color: var(--text-primary);
+}
+
 .msg {
   display: flex;
   max-width: 88%;
@@ -200,6 +235,20 @@
   color: var(--green-text);
   font-size: 11px;
   font-weight: 500;
+}
+
+.attachment-chip.image-chip {
+  background: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.chip-thumb {
+  width: 18px;
+  height: 18px;
+  object-fit: cover;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-right: 4px;
 }
 
 .attachment-more {
@@ -488,4 +537,139 @@
 
 .chat-input-blocked .input-hint {
   opacity: 0.3;
+}
+
+.editing-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--accent-dim);
+  border: 0.5px solid var(--accent-border);
+  color: var(--accent-text);
+  font-size: 11px;
+}
+
+.editing-banner button {
+  border: 0.5px solid var(--border-mid);
+  background: rgba(255,255,255,0.06);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 10px;
+}
+
+.media-picker {
+  max-height: 164px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 0.5px solid var(--border);
+  background: var(--bg-raised);
+}
+
+.media-picker-title {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 2px 2px 4px;
+}
+
+.media-picker-slideup {
+  animation: picker-slide-up 0.14s ease;
+}
+
+@keyframes picker-slide-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.media-picker-empty {
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 4px 2px;
+}
+
+.media-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0.5px solid var(--border);
+  background: var(--bg-overlay);
+  border-radius: 8px;
+  padding: 5px 8px;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.media-picker-item.selected {
+  border-color: var(--accent-border);
+  background: var(--accent-dim);
+  color: var(--accent-text);
+}
+
+.media-picker-item img {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.media-picker-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msg-actions {
+  margin-top: 7px;
+  display: flex;
+  gap: 6px;
+}
+
+.msg-actions button {
+  border: 0.5px solid var(--border-mid);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-muted);
+  border-radius: 6px;
+  font-size: 10px;
+  padding: 2px 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.msg-actions button:hover {
+  color: var(--text-primary);
+  background: rgba(255,255,255,0.08);
+}
+
+.attach-image-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 0.5px solid var(--border-mid);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}
+
+.attach-image-icon:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--accent-border);
+  background: var(--accent-dim);
+}
+
+.attach-image-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
