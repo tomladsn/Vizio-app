@@ -33,9 +33,6 @@ export function VizioDemo() {
         <Series.Sequence durationInFrames={SCENE.EXECUTING}    name="Executing">
           <FadeOut dur={SCENE.EXECUTING}><SceneExecuting /></FadeOut>
         </Series.Sequence>
-        <Series.Sequence durationInFrames={SCENE.SESSION_LOG}  name="Session Log">
-          <FadeOut dur={SCENE.SESSION_LOG}><SceneSessionLog /></FadeOut>
-        </Series.Sequence>
         <Series.Sequence durationInFrames={SCENE.SETTINGS}     name="Settings">
           <FadeOut dur={SCENE.SETTINGS}><SceneSettings /></FadeOut>
         </Series.Sequence>

@@ -144,6 +144,12 @@ export function SceneProjectGate() {
   return (
     <div style={{ width:W, height:H, position:'relative', background:'#000', overflow:'hidden' }}>
       <Aurora opacity={bgT} />
+      <div style={{
+        position:'absolute', inset:0,
+        background:'radial-gradient(circle at 30% 30%, rgba(139,53,204,0.14), transparent 20%), radial-gradient(circle at 70% 40%, rgba(27,159,212,0.12), transparent 16%)',
+        pointerEvents:'none',
+        opacity:bgT,
+      }} />
 
       {/* Card */}
       <div style={{
@@ -151,11 +157,12 @@ export function SceneProjectGate() {
         transform:`translate(-50%,-50%) scale(${0.92+cardT*0.08}) translateY(${(1-cardT)*20}px)`,
         opacity:cardT,
         width:560,
-        background:'rgba(10,15,28,0.90)',
+        background:'rgba(10,15,28,0.78)',
         border:`0.5px solid rgba(255,255,255,0.10)`,
         borderRadius:14,
         padding:'40px 40px 32px',
         backdropFilter:'blur(20px)',
+        boxShadow:'0 0 120px rgba(91,26,154,0.12)',
       }}>
         {/* Logo mark small */}
         <div style={{ display:'flex', justifyContent:'center', marginBottom:20 }}>
@@ -730,6 +737,11 @@ export function SceneOutro() {
   return (
     <div style={{ width:W, height:H, position:'relative', background:'#000', overflow:'hidden' }}>
       <Aurora />
+      <div style={{
+        position:'absolute', inset:0,
+        background: 'radial-gradient(circle at 32% 22%, rgba(139,53,204,0.18), transparent 24%),\n          radial-gradient(circle at 68% 40%, rgba(27,159,212,0.14), transparent 20%),\n          linear-gradient(180deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.96) 100%)',
+        pointerEvents:'none',
+      }} />
 
       {/* Logo mark */}
       <div style={{
@@ -737,13 +749,13 @@ export function SceneOutro() {
         transform:`translateX(-50%) scale(${0.85+logoT*0.15}) translateY(${(1-logoT)*18}px)`,
         opacity:logoT,
       }}>
-        <div style={{
-          width:80, height:80, borderRadius:16,
-          background:'linear-gradient(135deg,#6B1FA8,#1B9FD4)',
-          display:'flex', alignItems:'center', justifyContent:'center',
-          fontSize:36, color:'#fff', fontWeight:300,
-          boxShadow:`0 0 50px rgba(107,31,168,0.4)`,
-        }}>V</div>
+        <img
+          src={staticFile('icon.png')}
+          width={80}
+          height={80}
+          alt='Vizio logo'
+          style={{ width:80, height:80, objectFit:'contain', display:'block' }}
+        />
       </div>
 
       {/* Headline */}
