@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import './PreviewPanel.css'
 
-export default function PreviewPanel({ project, activeFile, sessionId }) {
+export default function PreviewPanel({ project, activeFile, sessionId, onMentionFile }) {
   const [activeTab,      setActiveTab]      = useState('preview')
   const [allSessions,    setAllSessions]    = useState([])
   const [viewingSession, setViewingSession] = useState(null)
@@ -69,6 +69,19 @@ export default function PreviewPanel({ project, activeFile, sessionId }) {
     return { label: status, cls: '' }
   })()
 
+  async function handleExport(sourcePath, defaultName) {
+    try {
+      const res = await window.electron.project.exportFile(sourcePath, defaultName)
+      if (res?.ok) {
+        console.log('Exported successfully to:', res.dest)
+      } else if (res?.message) {
+        alert(`Export failed: ${res.message}`)
+      }
+    } catch (err) {
+      alert(`Export failed: ${err.message}`)
+    }
+  }
+
   return (
     <div className="preview-panel">
       <div className="preview-tabs">
@@ -118,6 +131,20 @@ export default function PreviewPanel({ project, activeFile, sessionId }) {
                     onClick={() => { setAfterFile(f); setActiveTab('preview') }}
                   >
                     preview
+                  </button>
+                  <button
+                    className="of-btn mention-btn"
+                    title="Mention in chat"
+                    onClick={() => onMentionFile?.(f.name)}
+                  >
+                    mention
+                  </button>
+                  <button
+                    className="of-btn export-btn"
+                    title="Export file"
+                    onClick={() => handleExport(f.path, f.name)}
+                  >
+                    export
                   </button>
                   <button
                     className="of-btn open-btn"
@@ -286,6 +313,8 @@ function AttemptLog({ attempt, num }) {
 
 function VideoPane({ label, file, projectDir, processed }) {
   const [textPreview, setTextPreview] = useState(null)
+  const [probeInfo, setProbeInfo] = useState(null)
+  
   const filePath = file ? (typeof file === 'string' ? file : file.path) : ''
   const name = file ? (typeof file === 'string' ? filePath.split(/[\\/]/).pop() : file.name) : ''
   const ext = name ? name.split('.').pop().toLowerCase() : ''
@@ -316,12 +345,64 @@ function VideoPane({ label, file, projectDir, processed }) {
     return () => { cancelled = true }
   }, [filePath, isText, projectDir])
 
+  useEffect(() => {
+    if (!filePath) {
+      setProbeInfo(null)
+      return
+    }
+    let cancelled = false
+    window.electron.probeFiles([filePath])
+      .then(results => {
+        if (!cancelled && results?.[0] && !results[0].error) {
+          setProbeInfo(results[0])
+        } else if (!cancelled) {
+          setProbeInfo(null)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setProbeInfo(null)
+      })
+    return () => { cancelled = true }
+  }, [filePath])
+
+  function formatBytes(bytes) {
+    if (!bytes) return ''
+    const b = parseInt(bytes)
+    if (isNaN(b)) return ''
+    if (b < 1024 * 1024) return (b / 1024).toFixed(0) + ' KB'
+    return (b / 1024 / 1024).toFixed(1) + ' MB'
+  }
+
+  const videoStream = probeInfo?.streams?.find(s => s.type === 'video')
+  const audioStream = probeInfo?.streams?.find(s => s.type === 'audio')
+
+  const metaChips = []
+  if (ext) metaChips.push(ext.toUpperCase())
+  if (videoStream?.width && videoStream?.height) {
+    metaChips.push(`${videoStream.width}x${videoStream.height}`)
+  }
+  if (videoStream?.codec) {
+    metaChips.push(videoStream.codec)
+  } else if (audioStream?.codec) {
+    metaChips.push(audioStream.codec)
+  }
+  const duration = probeInfo?.format?.duration_sec || videoStream?.duration_sec || audioStream?.duration_sec
+  if (duration) {
+    metaChips.push(`${parseFloat(duration).toFixed(1)}s`)
+  }
+  const sizeStr = file?.size || formatBytes(probeInfo?.format?.size_bytes)
+  if (sizeStr) {
+    metaChips.push(sizeStr)
+  }
+
   if (!file) {
     return (
       <div className="video-pane">
         <div className="pane-label">
-          {label}
-          {processed && <span className="processed-badge">processed</span>}
+          <div className="pane-label-left">
+            <span className="pane-label-text">{label}</span>
+            {processed && <span className="processed-badge">processed</span>}
+          </div>
         </div>
         <div className="pane-screen">
           <div className="no-file-placeholder">
@@ -336,8 +417,15 @@ function VideoPane({ label, file, projectDir, processed }) {
   return (
     <div className="video-pane">
       <div className="pane-label">
-        {label}
-        {processed && <span className="processed-badge">processed</span>}
+        <div className="pane-label-left">
+          <span className="pane-label-text">{label}</span>
+          {processed && <span className="processed-badge">processed</span>}
+        </div>
+        {name && (
+          <span className="pane-file-name" title={filePath}>
+            {name}
+          </span>
+        )}
       </div>
       <div className="pane-screen">
         <div className="media-container">
@@ -367,6 +455,13 @@ function VideoPane({ label, file, projectDir, processed }) {
           )}
         </div>
       </div>
+      {metaChips.length > 0 && (
+        <div className="pane-meta-bar">
+          {metaChips.map((chip, idx) => (
+            <span key={idx} className="pane-meta-chip">{chip}</span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

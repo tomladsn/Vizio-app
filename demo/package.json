@@ -1,0 +1,22 @@
+{
+  "name": "vizio-demo",
+  "version": "1.0.0",
+"scripts": {
+  "start":  "npx remotion studio index.ts",
+  "render": "npx remotion render index.ts VizioDemo out/demo.mp4 --codec=h264",
+  "render:gif": "npx remotion render index.ts VizioDemo out/demo.gif --codec=gif --scale=0.5"
+},
+  "dependencies": {
+    "@remotion/cli": "4.0.0",
+    "remotion":      "4.0.0",
+    "react":         "^18.0.0",
+    "react-dom":     "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/react":  "^18.0.0",
+    "typescript":    "^5.0.0"
+  },
+  "remotion": {
+    "entryPoint": "index.ts"
+  }
+}

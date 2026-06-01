@@ -18,7 +18,9 @@ const CHAT_HISTORY_LIMIT = 10
 const MAX_CHAT_TITLE_LENGTH = 44
 const MAX_CONTEXT_FILES = 12
 const MAX_PROJECT_STATE_FILES = 20
+const MAX_TEXT_CONTEXT_CHARS = 24000
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif'])
+const TEXT_CONTEXT_EXTS = new Set(['srt', 'vtt', 'ass', 'ssa', 'txt', 'md'])
 
 const GENERIC_OPENERS = new Set([
   'hi', 'hello', 'hey', 'yo', 'sup', 'help', 'chat', 'new chat',
@@ -116,6 +118,14 @@ All output files must be saved here unless the user specifies otherwise. Use ful
 - "move"   -- fields: from, to
 - "write"  -- fields: path, content (text files)
 
+## TEXT FILE ANALYSIS
+When the user asks to analyze an attached or @mentioned .srt/.vtt/.txt/.md file and export a report:
+- The file contents are already provided above under "Text File Contents" when available.
+- Do not say "I will read", "Let me read", "I need to inspect", or ask to read the file later.
+- Return a workflow with a single "write" step that writes the finished report to a .txt file in the output directory.
+- Include the full report text in the "content" field. Use timestamps exactly as they appear in the source file.
+- If the relevant file contents are not present, return clarify mode and ask the user to attach or mention the file.
+
 ## PLATFORM
 Windows 10/11. PowerShell/cmd only. No bash syntax.
 
@@ -128,6 +138,7 @@ Windows 10/11. PowerShell/cmd only. No bash syntax.
 6. @mentions are syntax only -- never put @ in real paths.
 7. Process ALL files the user mentioned or attached.
 8. Use conversation memory for follow-ups (e.g. "make it smaller" refers to the last output).
+9. Never narrate tool use. The UI cannot execute prose like "Let me read the file"; it can only execute the JSON modes below.
 
 ## RESPONSE MODES
 
@@ -146,6 +157,14 @@ Windows 10/11. PowerShell/cmd only. No bash syntax.
     },
     {
       "id": 2,
+      "type": "write",
+      "title": "Write analysis report",
+      "description": "Save the finished recommendations as a text file",
+      "path": "${outputDir}/analysis_report.txt",
+      "content": "Report text here"
+    },
+    {
+      "id": 3,
       "type": "rename",
       "title": "Rename output to final name",
       "description": "Rename the output file",
@@ -551,6 +570,43 @@ function buildFileBlock(activeFile, probeData, projectFiles = [], inputText = ''
   return block || '## No file loaded'
 }
 
+async function buildTextFileContextBlock(projectDir, inputText, projectFiles = [], attachedFileNames = []) {
+  const files = getRequestedFiles(inputText, projectFiles, attachedFileNames)
+    .filter(file => TEXT_CONTEXT_EXTS.has(String(file.ext).toLowerCase()))
+    .slice(0, 3)
+
+  if (files.length === 0) return ''
+
+  const sections = []
+  let remainingChars = MAX_TEXT_CONTEXT_CHARS
+
+  for (const file of files) {
+    if (remainingChars <= 0) break
+
+    try {
+      const result = await window.electron.agent.readText(projectDir, file.path)
+      if (!result?.ok || typeof result.content !== 'string') {
+        sections.push(`### ${file.name}\nCould not read file: ${result?.message || 'Unknown error'}`)
+        continue
+      }
+
+      const content = result.content.slice(0, remainingChars)
+      remainingChars -= content.length
+      const truncated = result.content.length > content.length
+        ? `\n\n[Truncated after ${content.length} characters to keep the request manageable.]`
+        : ''
+
+      sections.push(`### ${file.name}\nPath: ${file.path}\n\n${content}${truncated}`)
+    } catch (err) {
+      sections.push(`### ${file.name}\nCould not read file: ${err.message}`)
+    }
+  }
+
+  return sections.length > 0
+    ? `## Text File Contents\n${sections.join('\n\n')}`
+    : ''
+}
+
 function buildCompletionSummary(workflow) {
   const lines = ['Done! Here\'s what was executed:']
   lines.push('')
@@ -702,16 +758,30 @@ export default function ChatPanel({
   const config = settingsStore.getActiveConfig()
   const imageLibraryFiles = projectFiles.filter(file => IMAGE_EXTS.has(file.ext))
 
+  function resizeInput() {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 156)}px`
+  }
+
   useEffect(() => {
     onMentionReady?.(insertMention)
   }, [onMentionReady])
+
+  useEffect(() => {
+    resizeInput()
+  }, [input])
 
   function insertMention(filename) {
     setInput(prev => {
       const tag = `@[${filename}]`
       return prev.trim() ? `${prev.trim()} ${tag} ` : `${tag} `
     })
-    setTimeout(() => inputRef.current?.focus(), 0)
+    setTimeout(() => {
+      inputRef.current?.focus()
+      resizeInput()
+    }, 0)
   }
 
   useEffect(() => {
@@ -985,7 +1055,10 @@ export default function ChatPanel({
     setEditingSourceMessage(msg.id)
     setInput(msg.content || '')
     setShowMediaPicker(false)
-    setTimeout(() => inputRef.current?.focus(), 0)
+    setTimeout(() => {
+      inputRef.current?.focus()
+      resizeInput()
+    }, 0)
   }
 
   async function redoPrompt(msg) {
@@ -995,7 +1068,8 @@ export default function ChatPanel({
   }
 
   async function handleSend(promptOverride = null) {
-    const text = (promptOverride ?? input).trim()
+    const overrideText = typeof promptOverride === 'string' ? promptOverride : null
+    const text = (overrideText ?? inputRef.current?.value ?? input).trim()
     if ((!text && attachedFiles.length === 0) || loading) return
 
     if (!config.isLocal && !isActiveReady) {
@@ -1084,9 +1158,19 @@ export default function ChatPanel({
         workflowStateRef.current,
       )
 
+      const textFileContextBlock = await buildTextFileContextBlock(
+        project.folderPath,
+        fullText,
+        projectFiles,
+        attachedFiles,
+      )
+
       const systemPrompt = buildSystemPrompt(
         toolsBlock ?? '## Tools\nffmpeg available\nffprobe available',
-        buildFileBlock(activeFile, probeData, projectFiles, fullText, attachedFiles),
+        [
+          buildFileBlock(activeFile, probeData, projectFiles, fullText, attachedFiles),
+          textFileContextBlock,
+        ].filter(Boolean).join('\n\n'),
         buildProjectStateBlock(projectFiles, outputFiles, project?.folderPath, attachedFiles),
         paths.outputDir,
         memoryBlock,
@@ -1144,6 +1228,8 @@ export default function ChatPanel({
             content:
               'Your last response was not valid JSON. You MUST respond with ONLY a raw JSON object -- ' +
               'no markdown fences, no explanation, no text before or after the JSON. ' +
+              'If you said you would read or inspect a file, stop narrating and instead use the provided file context. ' +
+              'For analysis reports or exported notes, return a workflow with a write step containing the final text. ' +
               'Try again now.',
           },
         ]
@@ -1159,10 +1245,12 @@ export default function ChatPanel({
       }
 
       if (!parsed) {
-        if (responseForHistory.trim()) {
+        const trimmedResponse = responseForHistory.trim()
+        const narratedToolUse = /\b(let me|i(?:'ll| will| need to| can)?)\s+(read|inspect|open|check|analy[sz]e)\b/i.test(trimmedResponse)
+        if (trimmedResponse && !narratedToolUse) {
           parsed = { mode: 'chat', message: responseForHistory.trim() }
         } else {
-          addAiMessage('I could not turn the model response into a runnable plan. Try again, or select the files and use a simpler command like `convert to webp`.', true)
+          addAiMessage('The model answered with narration instead of an executable plan. I need it to return JSON, such as a `write` step for a text report. Please send the prompt again; mentioned text and subtitle files are now included in the request context.', true)
           setLoading(false)
           return
         }
@@ -1214,7 +1302,10 @@ export default function ChatPanel({
 
   function applyPreset(prompt) {
     setInput(prompt)
-    setTimeout(() => inputRef.current?.focus(), 0)
+    setTimeout(() => {
+      inputRef.current?.focus()
+      resizeInput()
+    }, 0)
   }
 
   return (
@@ -1371,13 +1462,21 @@ export default function ChatPanel({
             placeholder={isReady ? 'Describe an edit or ask anything...' : 'Add an API key in Settings to start...'}
             value={input}
             disabled={loading || !isReady}
-            onChange={e => setInput(e.target.value)}
+            onChange={e => {
+              setInput(e.target.value)
+              resizeInput()
+            }}
             onKeyDown={handleKeyDown}
             rows={1}
           />
           <button
+            type="button"
             className={`send-btn ${loading ? 'loading' : ''}`}
-            onClick={loading ? handleStop : handleSend}
+            onMouseDown={e => e.preventDefault()}
+            onClick={() => {
+              if (loading) handleStop()
+              else handleSend()
+            }}
             title={loading ? 'Stop' : 'Send'}
             disabled={!isReady && !loading}
           >

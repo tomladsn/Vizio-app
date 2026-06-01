@@ -135,6 +135,37 @@ const TOOL_INSTALLERS = {
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
+let projectWatcher = null
+let currentWatchedDir = null
+
+function watchProjectDir(projectDir, webContents) {
+  if (currentWatchedDir === projectDir) return
+  if (projectWatcher) {
+    try {
+      projectWatcher.close()
+    } catch (_) {}
+    projectWatcher = null
+  }
+  currentWatchedDir = projectDir
+  if (!projectDir || !fs.existsSync(projectDir)) return
+
+  try {
+    projectWatcher = fs.watch(projectDir, { recursive: true }, (eventType, filename) => {
+      if (filename) {
+        const normalized = filename.replace(/\\/g, '/')
+        if (normalized.startsWith('sessions/') || normalized.startsWith('chats/') || normalized.startsWith('.')) {
+          return
+        }
+      }
+      if (!webContents.isDestroyed()) {
+        webContents.send('project:mediaChanged', { eventType, filename })
+      }
+    })
+  } catch (err) {
+    console.error('Failed to start project watcher:', err)
+  }
+}
+
 function getSessionDir(sessionId) {
   return path.join(app.getPath('userData'), 'sessions', sessionId)
 }
@@ -830,14 +861,33 @@ ipcMain.handle('project:getAll',    () => getAllProjects())
 ipcMain.handle('project:create',    (_, { name, folderPath }) => createProject({ name, folderPath }))
 ipcMain.handle('project:setLast',   (_, id) => setLastProject(id))
 ipcMain.handle('project:delete',    (_, id) => deleteProject(id))
-ipcMain.handle('project:getMedia',  (_, projectDir) => getProjectMedia(projectDir))
-ipcMain.handle('project:getOutputs', (_, projectDir) => getProjectOutputs(projectDir))
+ipcMain.handle('project:getMedia',  (event, projectDir) => {
+  watchProjectDir(projectDir, event.sender)
+  return getProjectMedia(projectDir)
+})
+ipcMain.handle('project:getOutputs', (event, projectDir) => {
+  watchProjectDir(projectDir, event.sender)
+  return getProjectOutputs(projectDir)
+})
 ipcMain.handle('project:copyMedia', (_, { sourcePath, projectDir }) => copyMediaToProject(sourcePath, projectDir))
 ipcMain.handle('project:deleteMedia', (_, { filePath, projectDir }) => deleteProjectMedia(projectDir, filePath))
 
 ipcMain.handle('project:choosePath', async () => {
   const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
   return result.canceled ? null : result.filePaths[0]
+})
+
+ipcMain.handle('project:exportFile', async (_, { sourcePath, defaultName }) => {
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    defaultPath: defaultName,
+  })
+  if (canceled || !filePath) return { ok: false }
+  try {
+    fs.copyFileSync(sourcePath, filePath)
+    return { ok: true, dest: filePath }
+  } catch (err) {
+    return { ok: false, message: err.message }
+  }
 })
 
 // Chat handlers

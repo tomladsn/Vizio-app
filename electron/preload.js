@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('electron', {
     copyMedia:   (sourcePath, projectDir)   => ipcRenderer.invoke('project:copyMedia', { sourcePath, projectDir }),
     deleteMedia: (filePath, projectDir)     => ipcRenderer.invoke('project:deleteMedia', { filePath, projectDir }),
     choosePath:  ()                         => ipcRenderer.invoke('project:choosePath'),
+    exportFile:  (sourcePath, defaultName)  => ipcRenderer.invoke('project:exportFile', { sourcePath, defaultName }),
   },
   chat: {
     list:   (projectDir)             => ipcRenderer.invoke('chat:list', projectDir),
@@ -80,6 +81,11 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.on('agent:done', fn)
     return () => ipcRenderer.removeListener('agent:done', fn)
   },
+  onMediaChanged: (cb) => {
+    const fn = (_, data) => cb(data)
+    ipcRenderer.on('project:mediaChanged', fn)
+    return () => ipcRenderer.removeListener('project:mediaChanged', fn)
+  },
 
   // Remove all agent listeners (call on component unmount)
   removeAgentListeners: () => {
@@ -87,6 +93,7 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.removeAllListeners('agent:stepCmdUpdate')
     ipcRenderer.removeAllListeners('agent:stepDone')
     ipcRenderer.removeAllListeners('agent:done')
+    ipcRenderer.removeAllListeners('project:mediaChanged')
   },
 
   // Agent filesystem ops (sandboxed to project dir)

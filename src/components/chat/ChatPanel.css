@@ -152,8 +152,9 @@
 
 .chat-input {
   flex: 1;
-  min-height: 24px;
-  max-height: 140px;
+  height: 34px;
+  min-height: 34px;
+  max-height: 156px;
   padding: 6px 0;
   background: transparent;
   border: none;
@@ -162,8 +163,12 @@
   line-height: 1.5;
   resize: none;
   outline: none;
-  overflow-y: auto;
+  overflow-y: hidden;
   font-family: inherit;
+}
+
+.chat-input:is(:focus, :not(:placeholder-shown)) {
+  overflow-y: auto;
 }
 
 .chat-input:disabled { opacity: 0.5; }

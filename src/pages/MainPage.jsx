@@ -45,6 +45,25 @@ export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSe
     setOutputFiles(outputs)
   }
 
+  // Subscribe to filesystem changes
+  useEffect(() => {
+    if (!project) return
+    let debounceTimer = null
+
+    const unlisten = window.electron.onMediaChanged(() => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => {
+        refreshMedia()
+        refreshOutputs()
+      }, 500)
+    })
+
+    return () => {
+      unlisten()
+      if (debounceTimer) clearTimeout(debounceTimer)
+    }
+  }, [project])
+
   async function handleWorkflowComplete() {
     await refreshMedia()
     await refreshOutputs()
@@ -134,7 +153,12 @@ export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSe
           reloadTrigger={reloadTrigger}
         />
 
-        <PreviewPanel project={project} activeFile={activeFile} sessionId={sessionId} />
+        <PreviewPanel
+          project={project}
+          activeFile={activeFile}
+          sessionId={sessionId}
+          onMentionFile={handleMentionFile}
+        />
 
         <div className="center-panel" style={{ position: 'relative' }}>
           <div className="chat-topbar">
