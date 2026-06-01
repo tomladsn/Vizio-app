@@ -1,0 +1,8 @@
+# Ignore demo build outputs and generated files
+/demo/
+
+# Ignore landing assets (local edits, images)
+/landing-assets/
+
+# Node modules
+/node_modules/

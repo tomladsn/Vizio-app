@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vizio — AI-Powered Media Workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="icon" href="./icon.ico" type="image/x-icon">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
+  /* ── Full logo palette ── */
+  --bg:       #07090f;   /* near-black, matching logo bg */
+  --bg2:      #0c1018;   /* panel bg */
+  --bg3:      #101620;   /* slightly lighter panels */
+  --bg4:      #15202e;   /* cards, inputs */
+  --bg5:      #1c2a3a;   /* hover states */
+
+  /* 0 — Red/crimson: warm anchor, balances the cool side */
+  --red:      #e03050;   /* vivid crimson-red */
+  --red2:     #b82040;   /* deeper red */
+  --red3:     #ff4d6a;   /* bright pop */
+  --red-soft: rgba(224,48,80,0.13);
+
+  /* 1 — Magenta-purple: left film strip top */
+  --mag:      #b040e8;
+  --mag2:     #8a28c8;   /* deeper, strip shadows */
+  --mag3:     #cc58f5;   /* bright highlight */
+  --mag-soft: rgba(176,64,232,0.13);
+
+  /* 2 — Indigo: strip transitions + waveform mid tones */
+  --indigo:   #4a50d8;
+  --indigo2:  #3a3fb8;
+  --indigo3:  #6870f0;
+  --indigo-soft: rgba(74,80,216,0.13);
+
+  /* 3 — Steel blue → teal: right film strip body */
+  --steel:    #2a70b8;
+  --teal:     #1a8898;
+  --cyan:     #18d8f0;   /* bright cyan (play button glow) */
+  --steel-soft: rgba(42,112,184,0.13);
+
+  /* Full gradient — red → magenta → indigo → steel → teal */
+  --grad:  linear-gradient(115deg, #e03050 0%, #b040e8 25%, #4a50d8 55%, #2a70b8 78%, #1a8898 100%);
+  /* Bright version — for text clips and CTA highlights */
+  --grad2: linear-gradient(115deg, #ff4d6a 0%, #cc58f5 28%, #6870f0 58%, #18d8f0 100%);
+  /* Short warm-to-cool — for buttons, badges */
+  --grad3: linear-gradient(115deg, #e03050 0%, #b040e8 50%, #4a50d8 100%);
+  /* Waveform gradient (decorative) */
+  --grad-wave: linear-gradient(90deg, #e03050 0%, #c040f0 30%, #5060e0 65%, #18d8f0 100%);
+
+  /* Borders — warm tint now that red is in the scheme */
+  --border:   rgba(160,100,180,0.09);
+  --border2:  rgba(160,100,180,0.17);
+  --border3:  rgba(160,100,180,0.28);
+
+  /* Text */
+  --text1:    #cdd6ee;
+  --text2:    #657a9c;
+  --text3:    #374058;
+
+  /* Semantic (green kept for success states only) */
+  --green:    #22c55e;
+}
+
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text1);font-family:var(--font-sans);line-height:1.65;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+
+/* ── NAV ─────────────────────────────────────────── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  height:56px;padding:0 48px;
+  display:flex;align-items:center;justify-content:space-between;
+  background:rgba(7,9,15,0.86);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+}
+.nav-logo{
+  font-family:var(--font-sans);font-weight:800;font-size:19px;letter-spacing:.04em;
+  background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  text-decoration:none;display:flex;align-items:center;gap:9px;
+}
+.nav-logo-icon{width:26px;height:26px;flex-shrink:0;}
+.nav-links{display:flex;align-items:center;gap:28px;list-style:none;}
+.nav-links a{font-size:13.5px;color:var(--text2);text-decoration:none;transition:color .18s;}
+.nav-links a:hover{color:var(--text1);}
+.nav-gh{
+  font-family:var(--font-mono)!important;font-size:11px!important;
+  color:var(--cyan)!important;border:1px solid rgba(0,212,232,0.25)!important;
+  padding:5px 13px;border-radius:5px;transition:background .18s!important;
+}
+.nav-gh:hover{background:rgba(0,212,232,0.07)!important;}
+.nav-toggle{
+  display:none;
+  width:38px;height:38px;border-radius:8px;
+  border:1px solid var(--border2);
+  background:rgba(12,16,24,.74);
+  color:var(--text1);
+  align-items:center;justify-content:center;
+  cursor:pointer;
+}
+.nav-toggle span{
+  position:relative;display:block;width:17px;height:2px;border-radius:99px;
+  background:currentColor;
+  transition:background .16s ease;
+}
+.nav-toggle span::before,
+.nav-toggle span::after{
+  content:'';position:absolute;left:0;width:17px;height:2px;border-radius:99px;
+  background:currentColor;
+  transition:transform .18s ease,top .18s ease;
+}
+.nav-toggle span::before{top:-6px;}
+.nav-toggle span::after{top:6px;}
+body.nav-open .nav-toggle span{background:transparent;}
+body.nav-open .nav-toggle span::before{top:0;transform:rotate(45deg);}
+body.nav-open .nav-toggle span::after{top:0;transform:rotate(-45deg);}
+body.nav-open{overflow:hidden;}
+
+/* ── HERO ─────────────────────────────────────────── */
+.hero{
+  position:relative;min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:120px 48px 80px;text-align:center;overflow:hidden;
+  background:var(--bg);
+}
+#hero-canvas{position:absolute;inset:0;z-index:0;pointer-events:all;cursor:default;}
+.hero-ornaments{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden;}
+.hero-orbit{
+  position:absolute;left:50%;top:48%;
+  width:min(720px,68vw);height:min(720px,68vw);
+  border-radius:50%;
+  transform:translate(-50%,-50%);
+  opacity:.75;
+  background:conic-gradient(from 90deg, transparent 0 18%, rgba(204,88,245,.32) 28%, transparent 42%, rgba(24,216,240,.16) 58%, transparent 74%, rgba(255,77,106,.22) 86%, transparent 100%);
+  -webkit-mask:radial-gradient(circle, transparent 0 63%, #000 64% 65%, transparent 66%);
+  mask:radial-gradient(circle, transparent 0 63%, #000 64% 65%, transparent 66%);
+  animation:orbitSpin 28s linear infinite;
+}
+.hero-orbit::before,.hero-orbit::after{
+  content:'';position:absolute;border-radius:50%;inset:12%;
+  border:1px solid rgba(24,216,240,.08);
+  -webkit-mask:none;mask:none;
+}
+.hero-orbit::after{
+  inset:27%;border-color:rgba(224,48,80,.10);
+}
+.orbit-dot{
+  position:absolute;width:8px;height:8px;border-radius:50%;
+  background:var(--grad2);
+  box-shadow:0 0 20px rgba(176,64,232,.55);
+  animation:dotPulse 2.8s ease-in-out infinite;
+}
+.orbit-dot.a{left:50%;top:-4px;}
+.orbit-dot.b{left:calc(100% - 4px);top:50%;animation-delay:-1.4s;background:var(--cyan);}
+.hero-chip{
+  position:absolute;
+  display:flex;align-items:center;gap:7px;
+  padding:7px 11px;border-radius:7px;
+  font-family:var(--font-mono);font-size:10px;color:rgba(205,214,238,.52);
+  background:rgba(12,16,24,.48);
+  border:1px solid rgba(160,100,180,.12);
+  backdrop-filter:blur(8px);
+  box-shadow:0 10px 36px rgba(0,0,0,.22);
+  animation:floatChip 7s ease-in-out infinite;
+}
+.hero-chip::before{
+  content:'';width:5px;height:5px;border-radius:50%;background:var(--mag3);
+  box-shadow:0 0 14px rgba(204,88,245,.55);
+}
+.hero-chip.c1{left:9%;top:22%;animation-delay:-1s;}
+.hero-chip.c2{right:10%;top:28%;animation-delay:-3s;}
+.hero-chip.c3{left:15%;bottom:23%;animation-delay:-5s;}
+.hero-chip.c4{right:15%;bottom:19%;animation-delay:-2s;}
+.hero-waveform{
+  position:absolute;left:50%;bottom:116px;
+  width:min(520px,58vw);height:58px;
+  transform:translateX(-50%);
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  opacity:.32;
+}
+.hero-waveform span{
+  width:4px;border-radius:99px;background:var(--grad-wave);
+  height:12px;
+  animation:waveBars 1.8s ease-in-out infinite;
+  box-shadow:0 0 16px rgba(176,64,232,.28);
+}
+.hero-waveform span:nth-child(2){animation-delay:.08s;height:24px;}
+.hero-waveform span:nth-child(3){animation-delay:.16s;height:38px;}
+.hero-waveform span:nth-child(4){animation-delay:.24s;height:28px;}
+.hero-waveform span:nth-child(5){animation-delay:.32s;height:48px;}
+.hero-waveform span:nth-child(6){animation-delay:.40s;height:22px;}
+.hero-waveform span:nth-child(7){animation-delay:.48s;height:34px;}
+.hero-waveform span:nth-child(8){animation-delay:.56s;height:18px;}
+.hero-vignette{
+  position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse 65% 55% at 50% 50%,transparent 35%,rgba(8,11,18,0.75) 100%);
+}
+.hero-fade{
+  position:absolute;bottom:0;left:0;right:0;height:220px;z-index:2;pointer-events:none;
+  background:linear-gradient(to bottom,transparent,var(--bg));
+}
+.hero-inner{position:relative;z-index:3;display:flex;flex-direction:column;align-items:center;}
+
+.hero-badge{
+  display:inline-flex;align-items:center;gap:8px;
+  font-family:var(--font-mono);font-size:10.5px;
+  color:var(--text2);letter-spacing:.12em;text-transform:uppercase;
+  background:rgba(8,11,18,0.6);border:1px solid var(--border2);
+  padding:5px 14px;border-radius:20px;margin-bottom:34px;backdrop-filter:blur(8px);
+}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:var(--red3);box-shadow:0 0 6px rgba(224,48,80,0.5);animation:blink 2.2s ease infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.2;}}
+
+.hero h1{
+  font-family:var(--font-sans);
+  font-size:clamp(44px,7vw,90px);
+  font-weight:800;line-height:1.02;letter-spacing:-.015em;
+  max-width:900px;margin-bottom:24px;color:#e0e8f8;
+}
+.hero h1 em{
+  font-style:normal;
+  background:var(--grad2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hero-sub{font-size:17px;font-weight:300;color:var(--text2);max-width:460px;margin-bottom:44px;line-height:1.8;}
+.hero-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+
+/* Primary button with platform dropdown */
+.btn-p-wrap{position:relative;display:inline-block;}
+.btn-p{
+  font-family:var(--font-mono);font-size:12.5px;
+  padding:13px 22px 13px 26px;border-radius:6px;
+  background:var(--grad);color:#fff;border:none;cursor:pointer;text-decoration:none;
+  letter-spacing:.02em;display:flex;align-items:center;gap:10px;
+  box-shadow:0 4px 24px rgba(157,47,224,0.35);
+  transition:opacity .2s,transform .15s;white-space:nowrap;
+}
+.btn-p:hover{opacity:.88;transform:translateY(-1px);}
+.btn-p-divider{width:1px;height:16px;background:rgba(255,255,255,0.25);}
+.btn-p-arrow{display:flex;align-items:center;padding:0 2px;cursor:pointer;}
+.platform-dropdown{
+  position:absolute;top:calc(100% + 8px);left:0;right:0;
+  background:var(--bg3);border:1px solid var(--border2);border-radius:8px;
+  overflow:hidden;z-index:50;
+  box-shadow:0 16px 48px rgba(0,0,0,0.6);
+  opacity:0;transform:translateY(-6px);pointer-events:none;
+  transition:opacity .18s,transform .18s;min-width:200px;
+}
+.platform-dropdown.open{opacity:1;transform:translateY(0);pointer-events:all;}
+.plat-item{
+  display:flex;align-items:center;gap:10px;
+  padding:11px 14px;cursor:pointer;
+  transition:background .15s;
+  font-size:13px;color:var(--text1);
+  border-bottom:1px solid var(--border);
+}
+.plat-item:last-child{border-bottom:none;}
+.plat-item:hover{background:var(--bg4);}
+.plat-item svg{flex-shrink:0;opacity:.7;}
+.plat-badge{
+  margin-left:auto;font-family:var(--font-mono);font-size:9px;
+  padding:2px 6px;border-radius:3px;
+}
+.badge-soon{background:rgba(120,140,200,0.12);color:var(--text3);}
+.badge-avail{background:rgba(157,47,224,0.15);color:var(--mag3);}
+
+.btn-s{
+  font-family:var(--font-mono);font-size:12.5px;
+  padding:12px 26px;border-radius:6px;
+  background:rgba(8,11,18,0.5);color:var(--text2);
+  border:1px solid var(--border2);cursor:pointer;text-decoration:none;
+  backdrop-filter:blur(8px);
+  transition:border-color .18s,color .18s,transform .15s;display:inline-block;
+}
+.btn-s:hover{border-color:var(--border3);color:var(--text1);transform:translateY(-1px);}
+
+.scroll-cue{
+  margin-top:52px;display:flex;flex-direction:column;align-items:center;gap:6px;
+  font-size:10.5px;color:var(--text3);letter-spacing:.14em;text-transform:uppercase;
+  font-family:var(--font-mono);animation:bob 2.8s ease-in-out infinite;
+}
+@keyframes bob{0%,100%{transform:translateY(0);}50%{transform:translateY(6px);}}
+@keyframes floatChip{
+  0%,100%{transform:translate3d(0,0,0);opacity:.42;}
+  50%{transform:translate3d(0,-14px,0);opacity:.86;}
+}
+@keyframes orbitSpin{
+  from{transform:translate(-50%,-50%) rotate(0deg);}
+  to{transform:translate(-50%,-50%) rotate(360deg);}
+}
+@keyframes dotPulse{
+  0%,100%{opacity:.35;transform:scale(.8);}
+  50%{opacity:1;transform:scale(1.18);}
+}
+@keyframes waveBars{
+  0%,100%{transform:scaleY(.45);opacity:.38;}
+  50%{transform:scaleY(1.15);opacity:.95;}
+}
+
+/* ── MOCKUP ──────────────────────────────────────── */
+.mockup-section{background:var(--bg);padding:0 40px 100px;display:flex;flex-direction:column;align-items:center;}
+.mockup-caption{font-size:13px;color:var(--text3);font-style:italic;margin-bottom:28px;letter-spacing:.01em;}
+.app-frame{
+  width:100%;max-width:1080px;border-radius:10px;border:1px solid var(--border2);
+  overflow:hidden;background:var(--bg2);
+  box-shadow:0 0 0 1px rgba(157,47,224,0.06),0 40px 90px rgba(0,0,0,0.8);
+}
+.frame-bar{
+  height:36px;background:#090d18;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 14px;gap:7px;
+}
+.dot{width:10px;height:10px;border-radius:50%;}
+.dr{background:#ff5f57;}.dy{background:#ffbd2e;}.dg{background:#28c840;}
+.frame-tabs{margin-left:10px;display:flex;}
+.ftab{font-family:var(--font-mono);font-size:10.5px;color:var(--text3);padding:0 14px;height:36px;display:flex;align-items:center;border-right:1px solid var(--border);letter-spacing:.03em;cursor:default;}
+.ftab.on{color:var(--text1);background:var(--bg2);}
+.ftab.proj{color:var(--text2);gap:5px;}
+.frame-wordmark{margin-left:auto;padding-right:14px;font-family:var(--font-sans);font-weight:700;font-size:13px;letter-spacing:.01em;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.frame-body{display:grid;grid-template-columns:200px 1fr 280px;height:490px;}
+
+/* Left panel */
+.fl{border-right:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg2);}
+.pan-hdr{padding:9px 12px 8px;font-family:var(--font-mono);font-size:9px;letter-spacing:.12em;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.pan-count{font-family:var(--font-mono);font-size:8.5px;color:var(--text3);background:var(--bg4);border:1px solid var(--border);padding:1px 5px;border-radius:3px;}
+.drop-zone{margin:12px;border-radius:7px;border:1px dashed var(--border2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:16px;cursor:default;background:var(--bg3);}
+.drop-icon{width:32px;height:32px;border-radius:7px;background:var(--bg4);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;}
+.drop-text{font-size:11px;color:var(--text2);text-align:center;line-height:1.4;font-weight:500;}
+.drop-sub{font-size:10px;color:var(--text3);text-align:center;}
+.mitem{display:flex;align-items:center;gap:7px;padding:7px 11px;border-bottom:1px solid rgba(100,120,180,0.05);cursor:default;}
+.mitem.sel{background:var(--mag-soft);border-left:2px solid rgba(157,47,224,0.45);padding-left:9px;}
+.mthumb{width:32px;height:24px;border-radius:3px;flex-shrink:0;overflow:hidden;}
+.mname{font-family:var(--font-mono);font-size:9.5px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mmeta{font-size:9px;color:var(--text3);margin-top:1px;}
+.mbadge{font-family:var(--font-mono);font-size:8px;padding:1px 4px;border-radius:2px;flex-shrink:0;}
+.bv{background:rgba(30,111,168,0.15);color:#4da8d8;}
+.bo{background:rgba(34,197,94,0.1);color:#22c55e;}
+.session-meta{margin-top:auto;padding:9px 11px;border-top:1px solid var(--border);background:#090d18;display:flex;flex-direction:column;gap:3px;}
+.sm-row{display:flex;justify-content:space-between;}
+.sm-k{font-family:var(--font-mono);font-size:8.5px;color:var(--text3);}
+.sm-v{font-family:var(--font-mono);font-size:8.5px;color:var(--text2);}
+.sm-ok{color:#22c55e;}.sm-c{color:var(--cyan);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* Center */
+.fc{display:flex;flex-direction:column;background:var(--bg2);}
+.tab-bar{display:flex;align-items:center;background:#090d18;border-bottom:1px solid var(--border);padding:0 14px;}
+.stab{font-family:var(--font-mono);font-size:10px;color:var(--text3);padding:11px 10px;cursor:default;border-bottom:2px solid transparent;letter-spacing:.03em;white-space:nowrap;}
+.stab.on{color:var(--text1);border-bottom-color:var(--mag);}
+.preview-body{flex:1;display:flex;}
+.before-pane,.after-pane{flex:1;display:flex;flex-direction:column;border-right:1px solid var(--border);}
+.after-pane{border-right:none;}
+.pane-label{font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.12em;padding:7px 12px;border-bottom:1px solid var(--border);text-transform:uppercase;}
+.pane-video{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;background:var(--bg3);}
+.play-ring{width:42px;height:42px;border-radius:50%;border:1px solid var(--border2);background:var(--bg4);display:flex;align-items:center;justify-content:center;}
+.no-file{font-size:11px;color:var(--text3);}
+.tasks-bar{padding:9px 14px 8px;border-top:1px solid var(--border);background:#090d18;}
+.tasks-lbl{font-family:var(--font-mono);font-size:9px;color:var(--text3);letter-spacing:.12em;text-transform:uppercase;margin-bottom:5px;}
+.tasks-empty{font-size:11px;color:var(--text3);font-style:italic;}
+
+/* Right */
+.fr{border-left:1px solid var(--border);display:flex;flex-direction:column;background:var(--bg2);}
+.chat-hdr{padding:9px 12px;background:#090d18;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.chat-hdr-title{font-family:var(--font-mono);font-size:10px;color:var(--text2);display:flex;align-items:center;gap:6px;}
+.chat-new-btn{font-family:var(--font-mono);font-size:9px;color:var(--text3);border:1px solid var(--border);padding:2px 7px;border-radius:3px;cursor:default;}
+.chat-plus{position:relative;flex:1;display:flex;align-items:center;justify-content:center;}
+.chat-plus-icon{color:var(--text3);font-size:22px;font-weight:300;}
+.chat-prompt-box{position:absolute;bottom:16px;right:10px;left:10px;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:14px;}
+.chat-prompt-title{font-size:14px;font-weight:600;color:var(--text1);margin-bottom:4px;text-align:center;}
+.chat-prompt-sub{font-size:11px;color:var(--text2);margin-bottom:12px;text-align:center;line-height:1.4;}
+.suggestion-pills{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;}
+.spill{font-family:var(--font-mono);font-size:9.5px;padding:4px 9px;border-radius:20px;border:1px solid var(--border2);background:var(--bg4);color:var(--text2);cursor:default;}
+.chat-foot{border-top:1px solid var(--border);}
+.chat-inp-row{padding:9px 12px;display:flex;gap:7px;align-items:center;}
+.cinput{flex:1;background:var(--bg4);border:1px solid var(--border2);border-radius:20px;padding:8px 14px;font-family:var(--font-sans);font-size:11.5px;color:var(--text2);outline:none;}
+.csend{width:32px;height:32px;border-radius:50%;background:var(--grad);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 12px rgba(157,47,224,0.4);}
+.chat-hint-row{padding:0 12px 8px;font-family:var(--font-mono);font-size:8px;color:var(--text3);}
+.chat-img-btn{width:26px;height:26px;border-radius:5px;border:1px solid var(--border);background:var(--bg4);display:flex;align-items:center;justify-content:center;cursor:default;flex-shrink:0;}
+
+/* ── LAYOUT ──────────────────────────────────────── */
+.wrap{max-width:1080px;margin:0 auto;padding:88px 48px;}
+.alt{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.alt-inner{max-width:1080px;margin:0 auto;padding:88px 48px;}
+
+.stag{display:block;font-family:var(--font-mono);font-size:10px;letter-spacing:.18em;color:var(--cyan);text-transform:uppercase;margin-bottom:12px;}
+.stitle{font-family:var(--font-sans);font-size:clamp(26px,3.6vw,42px);font-weight:750;letter-spacing:-.01em;line-height:1.14;color:var(--text1);margin-bottom:14px;}
+.ssub{font-size:15px;color:var(--text2);max-width:480px;line-height:1.8;font-weight:300;}
+
+/* HOW */
+.how-grid{margin-top:52px;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.hcell{background:var(--bg);padding:34px;position:relative;}
+.hnum{font-family:var(--font-sans);font-size:58px;font-weight:800;color:rgba(100,120,180,0.04);letter-spacing:0;position:absolute;top:14px;right:20px;pointer-events:none;}
+.hico{width:36px;height:36px;border-radius:8px;background:var(--mag-soft);border:1px solid rgba(157,47,224,0.2);display:flex;align-items:center;justify-content:center;margin-bottom:14px;}
+.htitle{font-family:var(--font-sans);font-size:16px;font-weight:700;color:var(--text1);margin-bottom:9px;letter-spacing:0;}
+.hdesc{font-size:13.5px;color:var(--text2);line-height:1.7;font-weight:300;}
+.hcode{margin-top:12px;font-family:var(--font-mono);font-size:10.5px;color:var(--cyan);background:rgba(0,212,232,0.05);border:1px solid rgba(0,212,232,0.12);padding:8px 12px;border-radius:4px;line-height:1.65;}
+
+/* PIPELINE */
+.pipe-svg-wrap{margin-top:44px;overflow-x:auto;}
+
+/* FEATURES */
+.feat-grid{margin-top:52px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.fcell{background:var(--bg);padding:28px;}
+.ficon-wrap{width:40px;height:40px;border-radius:9px;background:var(--mag-soft);border:1px solid rgba(157,47,224,0.2);display:flex;align-items:center;justify-content:center;margin-bottom:13px;}
+.ftitle2{font-family:var(--font-sans);font-size:14px;font-weight:700;color:var(--text1);margin-bottom:7px;}
+.fdesc{font-size:13px;color:var(--text2);line-height:1.67;font-weight:300;}
+
+/* TOOLS */
+.tools-row{margin-top:40px;display:flex;flex-wrap:wrap;gap:7px;}
+.tpill2{font-family:var(--font-mono);font-size:11.5px;padding:5px 12px;border-radius:4px;background:var(--bg3);border:1px solid var(--border2);color:var(--text2);display:flex;align-items:center;gap:7px;}
+.tdot{width:5px;height:5px;border-radius:50%;background:var(--mag);}
+
+/* PROVIDERS */
+.prov-grid{margin-top:40px;display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+.pcard{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:16px 12px;text-align:center;transition:border-color .18s;}
+.pcard:hover{border-color:var(--border2);}
+.pname{font-family:var(--font-sans);font-size:13px;font-weight:700;color:var(--text1);margin-bottom:5px;}
+.pmodels{font-family:var(--font-mono);font-size:8.5px;color:var(--text3);line-height:1.8;}
+
+/* CONTRIBUTORS */
+.contrib-grid{margin-top:46px;display:flex;flex-wrap:wrap;gap:12px;}
+.ccard{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:20px 22px;display:flex;align-items:center;gap:16px;text-decoration:none;min-width:280px;transition:border-color .2s,transform .16s;}
+.ccard:hover{border-color:rgba(157,47,224,0.3);transform:translateY(-2px);}
+.cavatar{width:48px;height:48px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-family:var(--font-sans);font-size:18px;font-weight:800;color:#fff;flex-shrink:0;}
+.cname{font-family:var(--font-sans);font-size:14px;font-weight:700;color:var(--text1);margin-bottom:2px;}
+.chandle{font-family:var(--font-mono);font-size:10.5px;color:var(--cyan);}
+.crole{font-size:11.5px;color:var(--text3);margin-top:3px;}
+.cgh-ico{margin-left:auto;opacity:.28;}
+.ccard-ghost{display:flex;align-items:center;gap:16px;padding:20px 22px;background:var(--bg3);border:1px dashed var(--border);border-radius:10px;min-width:280px;cursor:default;}
+.cgh-ring{width:48px;height:48px;border-radius:50%;border:1px dashed var(--border2);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+
+/* CTA */
+.cta-wrap{padding:100px 48px;text-align:center;position:relative;overflow:hidden;background:var(--bg);}
+.cta-glow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:600px;height:260px;background:radial-gradient(ellipse,rgba(157,47,224,0.1) 0%,transparent 70%);pointer-events:none;}
+.cta-inner{position:relative;max-width:520px;margin:0 auto;}
+.cta-inner h2{font-family:var(--font-sans);font-size:clamp(28px,4.5vw,48px);font-weight:750;letter-spacing:-.01em;line-height:1.12;margin-bottom:16px;}
+.cta-inner h2 em{font-style:normal;background:var(--grad2);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.cta-sub{font-size:15px;color:var(--text2);margin-bottom:36px;font-weight:300;line-height:1.8;}
+
+/* FOOTER */
+footer{padding:26px 48px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg);}
+.flogo{font-family:var(--font-sans);font-weight:800;font-size:15px;letter-spacing:.04em;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.fright{font-family:var(--font-mono);font-size:10.5px;color:var(--text3);}
+footer a{color:var(--text3);text-decoration:none;transition:color .18s;}
+footer a:hover{color:var(--text2);}
+
+/* ANIMATIONS */
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
+.fu{animation:fadeUp .7s ease forwards;}
+.d1{animation-delay:.1s;opacity:0;}.d2{animation-delay:.22s;opacity:0;}.d3{animation-delay:.36s;opacity:0;}.d4{animation-delay:.52s;opacity:0;}.d5{animation-delay:.68s;opacity:0;}
+
+/* SCROLL REVEAL */
+.sr{opacity:0;transform:translateY(22px);transition:opacity .65s ease,transform .65s ease;}
+.sr.visible{opacity:1;transform:translateY(0);}
+.sr-left{opacity:0;transform:translateX(-22px);transition:opacity .65s ease,transform .65s ease;}
+.sr-left.visible{opacity:1;transform:translateX(0);}
+.sr-scale{opacity:0;transform:scale(.94);transition:opacity .6s ease,transform .6s ease;}
+.sr-scale.visible{opacity:1;transform:scale(1);}
+
+/* SECTION TAG SHIMMER */
+@keyframes shimmerSlide{0%{background-position:200% center;}100%{background-position:-200% center;}}
+.stag{
+  background:linear-gradient(90deg,var(--cyan) 0%,#fff 40%,var(--mag3) 60%,var(--cyan) 100%);
+  background-size:200% auto;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  animation:shimmerSlide 4s linear infinite;
+}
+
+/* CARD HOVER GLOW */
+.hcell,.fcell,.pcard{
+  transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease;
+}
+.hcell:hover{transform:translateY(-3px);box-shadow:0 8px 32px rgba(176,64,232,0.12);border-color:rgba(176,64,232,0.18)!important;}
+.fcell:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(74,80,216,0.12);}
+
+/* BADGE PULSE RING */
+@keyframes ringPulse{0%{transform:scale(1);opacity:.5;}100%{transform:scale(2.4);opacity:0;}}
+.badge-dot::after{
+  content:'';position:absolute;inset:-3px;border-radius:50%;
+  border:1px solid rgba(224,48,80,0.5);
+  animation:ringPulse 2.2s ease-out infinite;
+}
+.badge-dot{position:relative;}
+
+/* HERO BADGE BORDER ANIMATION */
+@keyframes borderFlow{
+  0%{background-position:0% 50%;}
+  50%{background-position:100% 50%;}
+  100%{background-position:0% 50%;}
+}
+.hero-badge{
+  position:relative;
+}
+.hero-badge::before{
+  content:'';
+  position:absolute;inset:-1px;border-radius:21px;
+  background:linear-gradient(90deg,rgba(224,48,80,0.4),rgba(176,64,232,0.5),rgba(74,80,216,0.4),rgba(24,216,240,0.4),rgba(224,48,80,0.4));
+  background-size:300% 100%;
+  animation:borderFlow 4s linear infinite;
+  z-index:-1;
+  opacity:.7;
+}
+
+/* SMOOTH GRID LINE REVEAL */
+.how-grid{animation:none;}
+
+/* CTA GLOW PULSE */
+@keyframes glowPulse{0%,100%{opacity:.6;}50%{opacity:1;}}
+.cta-glow{animation:glowPulse 3.5s ease-in-out infinite;}
+
+/* PIPELINE SVG DASH ANIMATION */
+.pipe-line-anim{stroke-dasharray:200;stroke-dashoffset:200;transition:stroke-dashoffset 1.2s ease;}
+.pipe-line-anim.visible{stroke-dashoffset:0;}
+
+/* RESPONSIVE */
+@media(max-width:960px){
+  nav{padding:0 22px;}
+  .hero{padding:100px 22px 70px;}
+  .hero-chip{display:none;}
+  .hero-orbit{width:82vw;height:82vw;opacity:.42;}
+  .hero-waveform{bottom:92px;width:70vw;opacity:.22;}
+  .mockup-section{padding:0 20px 80px;}
+  .frame-body{grid-template-columns:1fr;height:auto;}
+  .fl,.fr{display:none;}
+  .wrap,.alt-inner{padding:60px 22px;}
+  .how-grid{grid-template-columns:1fr;}
+  .feat-grid{grid-template-columns:1fr 1fr;}
+  .prov-grid{grid-template-columns:repeat(3,1fr);}
+  .cta-wrap{padding:70px 22px;}
+  footer{padding:22px;flex-direction:column;gap:10px;text-align:center;}
+}
+@media(max-width:760px){
+  nav{padding:0 16px;}
+  .nav-logo{font-size:18px;}
+  .nav-toggle{display:flex;}
+  .nav-links{
+    position:fixed;top:56px;left:0;right:0;
+    display:flex;flex-direction:column;align-items:stretch;gap:0;
+    padding:10px 16px 18px;
+    background:rgba(7,9,15,.97);
+    border-bottom:1px solid var(--border2);
+    box-shadow:0 24px 60px rgba(0,0,0,.42);
+    transform:translateY(-12px);
+    opacity:0;visibility:hidden;pointer-events:none;
+    transition:opacity .18s ease,transform .18s ease,visibility .18s ease;
+  }
+  body.nav-open .nav-links{
+    transform:translateY(0);
+    opacity:1;visibility:visible;pointer-events:auto;
+  }
+  .nav-links li{border-bottom:1px solid rgba(160,100,180,.08);}
+  .nav-links li:last-child{border-bottom:0;padding-top:10px;}
+  .nav-links a{
+    display:flex;align-items:center;justify-content:space-between;
+    min-height:44px;font-size:15px;color:var(--text1);
+  }
+  .nav-gh{
+    justify-content:center!important;
+    min-height:40px!important;
+    padding:9px 13px!important;
+    background:rgba(0,212,232,.06)!important;
+  }
+}
+@media(max-width:600px){
+  .feat-grid{grid-template-columns:1fr;}
+  .prov-grid{grid-template-columns:repeat(2,1fr);}
+  .hero-actions{flex-direction:column;align-items:center;}
+  .btn-p-wrap{width:100%;}
+  .btn-p{width:100%;justify-content:center;}
+}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto;}
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;}
+  .hero-chip,.hero-orbit,.hero-waveform{opacity:.32;}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo">
+    <img src="./vizio-logo.webp" alt="Vizio logo" width="28" height="28" decoding="async" fetchpriority="high"/>
+     <div class="flogo">Vizio</div>
+  </a>
+  <button class="nav-toggle" type="button" aria-label="Open menu" aria-controls="nav-links" aria-expanded="false">
+    <span aria-hidden="true"></span>
+  </button>
+  <ul class="nav-links" id="nav-links">
+    <li><a href="#how">How it works</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#tools">Tools</a></li>
+    <li><a href="#contributors">Contributors</a></li>
+    <li><a href="https://github.com/tomladsn/Vizio-app" target="_blank" rel="noopener" class="nav-gh">GitHub ↗</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <canvas id="hero-canvas"></canvas>
+  <div class="hero-ornaments" aria-hidden="true">
+    <div class="hero-orbit">
+      <span class="orbit-dot a"></span>
+      <span class="orbit-dot b"></span>
+    </div>
+    <div class="hero-chip c1">ffmpeg -y</div>
+    <div class="hero-chip c2">AAC 192k</div>
+    <div class="hero-chip c3">SRT report</div>
+    <div class="hero-chip c4">1080p</div>
+    <div class="hero-waveform">
+      <span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+  <div class="hero-vignette"></div>
+  <div class="hero-fade"></div>
+  <div class="hero-inner">
+    <div class="hero-badge fu">
+      <span class="badge-dot"></span>
+      Open source · Windows
+    </div>
+    <h1 class="fu d1">Describe it.<br><em>Vizio executes it.</em></h1>
+    <p class="hero-sub fu d2">Turn plain language into automated media pipelines. No scripts, no flags — just say what you need done.</p>
+    <div class="hero-actions fu d3">
+      <!-- Download with platform dropdown -->
+      <div class="btn-p-wrap" id="downloadWrap">
+        <button class="btn-p" id="downloadBtn" type="button">
+          <!-- Windows icon -->
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5.5" height="5.5" rx="0.5" fill="white" opacity="0.9"/><rect x="7.5" y="1" width="5.5" height="5.5" rx="0.5" fill="white" opacity="0.9"/><rect x="1" y="7.5" width="5.5" height="5.5" rx="0.5" fill="white" opacity="0.9"/><rect x="7.5" y="7.5" width="5.5" height="5.5" rx="0.5" fill="white" opacity="0.9"/></svg>
+          Download
+          <span class="btn-p-divider"></span>
+          <span class="btn-p-arrow" id="dropArrow">
+            <svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1L5.5 6L10 1" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        </button>
+        <div class="platform-dropdown" id="platformDrop">
+          <a class="plat-item" href="https://github.com/tomladsn/Vizio-app" target="_blank" rel="noopener">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6.5" height="6.5" rx="0.6" fill="#c9d3e8"/><rect x="8.5" y="1" width="6.5" height="6.5" rx="0.6" fill="#c9d3e8"/><rect x="1" y="8.5" width="6.5" height="6.5" rx="0.6" fill="#c9d3e8"/><rect x="8.5" y="8.5" width="6.5" height="6.5" rx="0.6" fill="#c9d3e8"/></svg>
+            Windows
+            <span class="plat-badge badge-avail">Available</span>
+          </a>
+          <div class="plat-item" style="cursor:default;opacity:.55;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5C4.4 1.5 1.5 4.4 1.5 8s2.9 6.5 6.5 6.5 6.5-2.9 6.5-6.5S11.6 1.5 8 1.5zM8 3c.8 0 1.5.3 2.1.8L3.8 10.1C3.3 9.5 3 8.8 3 8c0-2.8 2.2-5 5-5zm0 10c-.8 0-1.5-.3-2.1-.8l6.3-6.3c.5.6.8 1.3.8 2.1 0 2.8-2.2 5-5 5z" fill="#6a7d9e"/></svg>
+            macOS
+            <span class="plat-badge badge-soon">Coming soon</span>
+          </div>
+          <div class="plat-item" style="cursor:default;opacity:.55;">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" fill="none" stroke="#6a7d9e" stroke-width="1.1"/><path d="M8 3v10M3 8h10" stroke="#6a7d9e" stroke-width="1"/></svg>
+            Linux
+            <span class="plat-badge badge-soon">Coming soon</span>
+          </div>
+        </div>
+      </div>
+      <a href="https://github.com/tomladsn/Vizio-app" target="_blank" rel="noopener" class="btn-s">View on GitHub →</a>
+    </div>
+    <div class="scroll-cue fu d4">
+      <span>scroll</span>
+      <svg width="12" height="7" viewBox="0 0 12 7" fill="none"><path d="M1 1L6 6L11 1" stroke="#384055" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+  </div>
+</div>
+
+<!-- MOCKUP -->
+<div class="mockup-section">
+  <p class="mockup-caption fu d5">The Vizio workspace — preview panel, media library, and AI chat.</p>
+  <div class="app-frame fu d5">
+    <div class="frame-bar">
+      <div class="dot dr"></div><div class="dot dy"></div><div class="dot dg"></div>
+      <div class="frame-tabs">
+        <div class="ftab" style="font-size:9.5px;">◂</div>
+        <div class="ftab" style="font-size:9.5px;">▸</div>
+        <div class="ftab proj">
+          <svg width="11" height="11" viewBox="0 0 11 11"><circle cx="5.5" cy="5.5" r="4.5" fill="none" stroke="#b040e8" stroke-width="0.9"/><path d="M3.5 5.5l1.3 1.3L7.5 3.5" stroke="#b040e8" stroke-width="0.9" fill="none" stroke-linecap="round"/></svg>
+          crake ↓
+        </div>
+        <div class="ftab on">Workspace</div>
+        <div class="ftab">Tools</div>
+        <div class="ftab">Settings</div>
+      </div>
+      <div class="frame-wordmark">Vizio</div>
+    </div>
+    <div class="frame-body">
+      <!-- Left -->
+      <div class="fl">
+        <div class="pan-hdr">Media <span class="pan-count">4 files</span></div>
+        <div class="drop-zone">
+          <div class="drop-icon"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v8M7 10l-2.5-2.5M7 10l2.5-2.5" stroke="#6a7d9e" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/><rect x="1" y="11" width="12" height="2" rx="1" fill="#6a7d9e" opacity="0.4"/></svg></div>
+          <div class="drop-text">Drop media files here</div>
+          <div class="drop-sub">They'll be copied into your project</div>
+        </div>
+        <div class="mitem sel">
+          <div class="mthumb"><svg width="32" height="24" viewBox="0 0 32 24"><rect width="32" height="24" fill="#0e1830"/><polygon points="11,6 11,18 22,12" fill="#9d2fe0" opacity="0.7"/></svg></div>
+          <div style="flex:1;min-width:0;"><div class="mname">interview_raw.mp4</div><div class="mmeta">4.2 MB · .mp4</div></div>
+          <div class="mbadge bv">MP4</div>
+        </div>
+        <div class="mitem">
+          <div class="mthumb"><svg width="32" height="24" viewBox="0 0 32 24"><rect width="32" height="24" fill="#0e1830"/><polygon points="11,6 11,18 22,12" fill="#1e6fa8" opacity="0.7"/></svg></div>
+          <div style="flex:1;min-width:0;"><div class="mname">clip_04_three_...</div><div class="mmeta">3.9 MB · .mp4</div></div>
+          <div class="mbadge bv">MP4</div>
+        </div>
+        <div class="mitem">
+          <div class="mthumb"><svg width="32" height="24" viewBox="0 0 32 24"><rect width="32" height="24" fill="#0a1a0e"/><rect x="4" y="10" width="24" height="3" rx="1.5" fill="#22c55e" opacity="0.5"/></svg></div>
+          <div style="flex:1;min-width:0;"><div class="mname">output_final.mp4</div><div class="mmeta">320 MB · .mp4</div></div>
+          <div class="mbadge bo">OUT</div>
+        </div>
+        <div class="session-meta">
+          <div class="sm-row"><span class="sm-k">provider</span><span class="sm-v">Ollama</span></div>
+          <div class="sm-row"><span class="sm-k">model</span><span class="sm-v sm-c">gemma4:31b-cloud</span></div>
+          <div class="sm-row"><span class="sm-k">status</span><span class="sm-v sm-ok">local</span></div>
+        </div>
+      </div>
+      <!-- Center -->
+      <div class="fc">
+        <div class="tab-bar">
+          <div class="stab on">preview</div>
+          <div class="stab">output files</div>
+          <div class="stab">session log</div>
+        </div>
+        <div class="preview-body">
+          <div class="before-pane">
+            <div class="pane-label">Before</div>
+            <div class="pane-video">
+              <div class="play-ring"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><polygon points="4,2 12,7 4,12" fill="#6a7d9e"/></svg></div>
+              <div class="no-file">No file selected</div>
+            </div>
+          </div>
+          <div class="after-pane">
+            <div class="pane-label">After</div>
+            <div class="pane-video">
+              <div class="play-ring"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><polygon points="4,2 12,7 4,12" fill="#6a7d9e"/></svg></div>
+              <div class="no-file">No file selected</div>
+            </div>
+          </div>
+        </div>
+        <div class="tasks-bar">
+          <div class="tasks-lbl">Tasks</div>
+          <div class="tasks-empty">No tasks yet — describe an edit in the chat</div>
+        </div>
+      </div>
+      <!-- Right -->
+      <div class="fr">
+        <div class="chat-hdr">
+          <div class="chat-hdr-title"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="1" width="11" height="11" rx="2" fill="none" stroke="#6a7d9e" stroke-width="0.9"/><line x1="4" y1="4" x2="9" y2="4" stroke="#6a7d9e" stroke-width="0.8"/><line x1="4" y1="7" x2="7" y2="7" stroke="#6a7d9e" stroke-width="0.8"/></svg> New chat</div>
+          <span class="chat-new-btn">+ New chat</span>
+        </div>
+        <div class="chat-plus">
+          <span class="chat-plus-icon">+</span>
+          <div class="chat-prompt-box">
+            <div class="chat-prompt-title">What do you want to do?</div>
+            <div class="chat-prompt-sub">Describe an edit, ask a question, or mention a file with @</div>
+            <div class="suggestion-pills">
+              <div class="spill">Trim 30s</div><div class="spill">To WebP</div><div class="spill">Extract MP3</div>
+              <div class="spill">Compress</div><div class="spill">720p scale</div><div class="spill">Mute audio</div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-foot">
+          <div class="chat-inp-row">
+            <div class="chat-img-btn"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="2" width="10" height="8" rx="1.5" fill="none" stroke="#6a7d9e" stroke-width="0.9"/><circle cx="4" cy="5" r="1" fill="#6a7d9e" opacity="0.6"/><path d="M1 9l2.5-2 2 1.5 2-2.5 2.5 3" stroke="#6a7d9e" stroke-width="0.8" fill="none" stroke-linecap="round"/></svg></div>
+            <input class="cinput" type="text" placeholder="Describe an edit or ask anything…" readonly>
+            <button class="csend" aria-label="Send"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 11L11 6L1 1V5L9 6L1 7V11Z" fill="white"/></svg></button>
+          </div>
+          <div class="chat-hint-row">Enter to send · Shift+Enter for new line · Use @ to mention files</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<div class="wrap" id="how">
+  <span class="stag">How it works</span>
+  <h2 class="stitle">From plain English<br>to executed pipeline</h2>
+  <p class="ssub">No syntax, no flags, no command memorization. Describe what you want — Vizio plans and runs the work.</p>
+  <div class="how-grid">
+    <div class="hcell">
+      <div class="hnum">01</div>
+      <div class="hico" style="background:var(--red-soft);border-color:rgba(224,48,80,0.22);">
+        <!-- Chat bubble — red accent, mirrors logo chat element -->
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="3" width="14" height="10" rx="2.5" fill="none" stroke="#ff4d6a" stroke-width="1.1"/><circle cx="6" cy="8" r="1" fill="#ff4d6a"/><circle cx="9" cy="8" r="1" fill="#ff4d6a"/><circle cx="12" cy="8" r="1" fill="#ff4d6a"/><path d="M6 13l1.5 2" stroke="#ff4d6a" stroke-width="1" stroke-linecap="round"/></svg>
+      </div>
+      <div class="htitle">Describe your goal</div>
+      <div class="hdesc">Type what you need in plain language. Attach files with @ mentions. Vizio reads the project context and incorporates it automatically.</div>
+      <div class="hcode">"Compress the interview, add subtitles, mix in the soundtrack at 30%."</div>
+    </div>
+    <div class="hcell">
+      <div class="hnum">02</div>
+      <div class="hico">
+        <!-- Waveform — red→magenta→indigo→steel→cyan left to right -->
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="1" y="7" width="2" height="4" rx="1" fill="#ff4d6a"/><rect x="4" y="5" width="2" height="8" rx="1" fill="#cc58f5"/><rect x="7" y="3" width="2" height="12" rx="1" fill="#6060e0"/><rect x="10" y="5" width="2" height="8" rx="1" fill="#2a80c8"/><rect x="13" y="6" width="2" height="6" rx="1" fill="#18d8f0"/><rect x="16" y="7.5" width="1.5" height="3" rx="0.75" fill="#18d8f0" opacity="0.6"/></svg>
+      </div>
+      <div class="htitle">Agent plans the workflow</div>
+      <div class="hdesc">The AI generates a structured multi-step JSON workflow — not a one-liner. Each step is individually tracked in the session log and retried automatically on failure.</div>
+    </div>
+    <div class="hcell">
+      <div class="hnum">03</div>
+      <div class="hico">
+        <!-- Film strip — magenta matching logo left strip -->
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="2" y="3" width="14" height="12" rx="1.5" fill="none" stroke="#b040e8" stroke-width="1"/><rect x="2" y="5" width="2" height="2" rx="0.4" fill="#b040e8" opacity="0.6"/><rect x="2" y="8" width="2" height="2" rx="0.4" fill="#b040e8" opacity="0.6"/><rect x="2" y="11" width="2" height="2" rx="0.4" fill="#b040e8" opacity="0.6"/><rect x="14" y="5" width="2" height="2" rx="0.4" fill="#4a50d8" opacity="0.6"/><rect x="14" y="8" width="2" height="2" rx="0.4" fill="#4a50d8" opacity="0.6"/><rect x="14" y="11" width="2" height="2" rx="0.4" fill="#4a50d8" opacity="0.6"/><polygon points="7,7 7,12 12,9.5" fill="#b040e8" opacity="0.7"/></svg>
+      </div>
+      <div class="htitle">Tools execute each step</div>
+      <div class="hdesc">ffmpeg, Whisper, yt-dlp, ImageMagick run the real work. Real-time per-step progress, full stdout/stderr logs, and batch processing across multiple files.</div>
+    </div>
+    <div class="hcell">
+      <div class="hnum">04</div>
+      <div class="hico" style="background:rgba(24,216,240,0.08);border-color:rgba(24,216,240,0.18);">
+        <!-- Play button — cyan matching logo play element -->
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="6.5" fill="none" stroke="#18d8f0" stroke-width="1"/><polygon points="7,6.5 7,11.5 12.5,9" fill="#18d8f0"/></svg>
+      </div>
+      <div class="htitle">Self-healing on failure</div>
+      <div class="hdesc">If a step fails, the AI reads the full error log, diagnoses the cause — wrong flag, bad path, missing codec — and retries with a corrected command. Up to 3 attempts.</div>
+    </div>
+  </div>
+</div>
+
+<!-- PIPELINE -->
+<div class="alt">
+  <div class="alt-inner">
+    <span class="stag">Execution model</span>
+    <h2 class="stitle" style="margin-bottom:44px;">The workflow loop</h2>
+    <div class="pipe-svg-wrap">
+      <svg width="100%" viewBox="0 0 1040 128" xmlns="http://www.w3.org/2000/svg" role="img">
+        <title>Vizio pipeline: prompt to output with self-healing retry</title>
+        <defs>
+          <linearGradient id="pg" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#e03050"/><stop offset="22%" stop-color="#b040e8"/><stop offset="50%" stop-color="#4a50d8"/><stop offset="75%" stop-color="#2a70b8"/><stop offset="100%" stop-color="#1a8898"/></linearGradient>
+          <marker id="ma" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M2 1L8 5L2 9" fill="none" stroke="#374058" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+          <marker id="mb" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M2 1L8 5L2 9" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+          <marker id="mc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M2 1L8 5L2 9" fill="none" stroke="#e03050" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker>
+        </defs>
+        <rect x="18" y="28" width="136" height="44" rx="6" fill="#0c1018" stroke="#e03050" stroke-width="0.8"/>
+        <text x="86" y="46" text-anchor="middle" font-family="JetBrains Mono, Fira Code, Consolas, monospace" font-size="9" fill="#ff4d6a" letter-spacing="1">USER PROMPT</text>
+        <text x="86" y="62" text-anchor="middle" font-family="Inter, Segoe UI, system-ui, sans-serif" font-size="10.5" fill="#657a9c" font-style="italic">"Compress + subtitle"</text>
+        <line x1="154" y1="50" x2="192" y2="50" stroke="#374058" stroke-width="0.8" marker-end="url(#ma)"/>
+        <rect x="192" y="28" width="136" height="44" rx="6" fill="#0c1018" stroke="#4a50d8" stroke-width="0.8"/>
+        <text x="260" y="46" text-anchor="middle" font-family="JetBrains Mono, Fira Code, Consolas, monospace" font-size="9" fill="#6870f0" letter-spacing="1">AGENT PLANS</text>
+        <text x="260" y="62" text-anchor="middle" font-family="Inter, Segoe UI, system-ui, sans-serif" font-size="10.5" fill="#657a9c">JSON workflow</text>
+        <line x1="328" y1="50" x2="366" y2="50" stroke="#374058" stroke-width="0.8" marker-end="url(#ma)"/>
+        <rect x="366" y="28" width="136" height="44" rx="6" fill="#0c1018" stroke="#2a70b8" stroke-width="0.8"/>
+        <text x="434" y="46" text-anchor="middle" font-family="JetBrains Mono, Fira Code, Consolas, monospace" font-size="9" fill="#4a9ad8" letter-spacing="1">EXECUTE STEP</text>
+        <text x="434" y="62" text-anchor="middle" font-family="Inter, Segoe UI, system-ui, sans-serif" font-size="10.5" fill="#657a9c">ffmpeg / whisper</text>
+        <line x1="502" y1="50" x2="540" y2="50" stroke="#374058" stroke-width="0.8" marker-end="url(#ma)"/>
+        <rect x="540" y="28" width="136" height="44" rx="6" fill="#0c1018" stroke="#1a8898" stroke-width="0.8"/>
+        <text x="608" y="46" text-anchor="middle" font-family="JetBrains Mono, Fira Code, Consolas, monospace" font-size="9" fill="#18d8f0" letter-spacing="1">VALIDATE</text>
+        <text x="608" y="62" text-anchor="middle" font-family="Inter, Segoe UI, system-ui, sans-serif" font-size="10.5" fill="#657a9c">exit code check</text>
+        <line x1="676" y1="50" x2="714" y2="50" stroke="#22c55e" stroke-width="0.8" marker-end="url(#mb)"/>
+        <text x="695" y="44" text-anchor="middle" font-family="JetBrains Mono, Fira Code, Consolas, monospace" font-size="8" fill="#22c55e">pass</text>
+        <rect x="714" y="28" width="136" height="44" rx="6" fill="#0b1810" stroke="#22c55e" stroke-width="0.8"/>
+        <text x="782" y="46" text-anchor="middle" font-family="JetBrains Mono, Fira Code, Consolas, monospace" font-size="9" fill="#22c55e" letter-spacing="1">OUTPUT SAVED</text>
+        <text x="782" y="62" text-anchor="middle" font-family="Inter, Segoe UI, system-ui, sans-serif" font-size="10.5" fill="#6a7d9e">project/output/</text>
+        <path d="M 608 72 Q 608 104 476 104 Q 380 104 434 72" fill="none" stroke="#ef4444" stroke-width="0.8" stroke-dasharray="4 3" marker-end="url(#mc)"/>
+        <text x="518" y="117" text-anchor="middle" font-family="JetBrains Mono, Fira Code, Consolas, monospace" font-size="8" fill="#ef4444">fail → AI diagnoses + retries (max 3×)</text>
+        <line x1="850" y1="50" x2="888" y2="50" stroke="#384055" stroke-width="0.8" marker-end="url(#ma)"/>
+        <text x="960" y="54" text-anchor="middle" font-family="JetBrains Mono, Fira Code, Consolas, monospace" font-size="9" fill="#384055">next step →</text>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<div class="wrap" id="features">
+  <span class="stag">Features</span>
+  <h2 class="stitle">Everything in one workspace</h2>
+  <div class="feat-grid">
+    <div class="fcell">
+      <div class="ficon-wrap" style="background:var(--red-soft);border-color:rgba(224,48,80,0.2);">
+        <!-- Chat bubble — red accent, logo language -->
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="3" width="16" height="11" rx="3" fill="none" stroke="#ff4d6a" stroke-width="1.1"/><circle cx="7" cy="8.5" r="1.1" fill="#ff4d6a"/><circle cx="10" cy="8.5" r="1.1" fill="#ff4d6a"/><circle cx="13" cy="8.5" r="1.1" fill="#ff4d6a"/><path d="M7 14l2 2.5" stroke="#ff4d6a" stroke-width="1" stroke-linecap="round"/></svg>
+      </div>
+      <div class="ftitle2">AI workflow generation</div>
+      <div class="fdesc">Describe the goal. The agent plans a structured multi-step workflow with individually trackable steps and full session logging.</div>
+    </div>
+    <div class="fcell">
+      <div class="ficon-wrap" style="background:var(--indigo-soft);border-color:rgba(74,80,216,0.2);">
+        <!-- Waveform bars — red→magenta→indigo→cyan spectrum -->
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="1" y="8" width="2" height="4" rx="1" fill="#ff4d6a"/><rect x="4" y="6" width="2" height="8" rx="1" fill="#cc58f5"/><rect x="7" y="4" width="2" height="12" rx="1" fill="#4a50d8"/><rect x="10" y="5" width="2" height="10" rx="1" fill="#2a90c8"/><rect x="13" y="7" width="2" height="6" rx="1" fill="#18d8f0"/><rect x="16" y="8.5" width="2" height="3" rx="1" fill="#18d8f0" opacity="0.7"/></svg>
+      </div>
+      <div class="ftitle2">Self-healing execution</div>
+      <div class="fdesc">On failure, the AI reads stderr, identifies the root cause, corrects the command, and retries — up to 3 attempts per step, automatically.</div>
+    </div>
+    <div class="fcell">
+      <div class="ficon-wrap">
+        <!-- Film strip — magenta left strip, indigo right -->
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="12" rx="1.5" fill="none" stroke="#b040e8" stroke-width="1"/><rect x="2" y="6.5" width="2.5" height="2" rx="0.5" fill="#b040e8" opacity="0.6"/><rect x="2" y="9.5" width="2.5" height="2" rx="0.5" fill="#b040e8" opacity="0.6"/><rect x="15.5" y="6.5" width="2.5" height="2" rx="0.5" fill="#4a50d8" opacity="0.6"/><rect x="15.5" y="9.5" width="2.5" height="2" rx="0.5" fill="#4a50d8" opacity="0.6"/><polygon points="8,7.5 8,12.5 13.5,10" fill="#b040e8" opacity="0.7"/></svg>
+      </div>
+      <div class="ftitle2">Project management</div>
+      <div class="fdesc">Work organized into projects with dedicated input, output, and session folders. Every AI decision is saved to the session log.</div>
+    </div>
+    <div class="fcell">
+      <div class="ficon-wrap" style="background:var(--indigo-soft);border-color:rgba(74,80,216,0.2);">
+        <!-- Media library grid — full spectrum each quadrant -->
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="2" width="7" height="7" rx="1.5" fill="none" stroke="#e03050" stroke-width="1"/><rect x="11" y="2" width="7" height="7" rx="1.5" fill="none" stroke="#b040e8" stroke-width="1"/><rect x="2" y="11" width="7" height="7" rx="1.5" fill="none" stroke="#4a50d8" stroke-width="1"/><rect x="11" y="11" width="7" height="7" rx="1.5" fill="none" stroke="#1a8898" stroke-width="1"/><polygon points="13,13 13,17 17,15" fill="#18d8f0" opacity="0.7"/></svg>
+      </div>
+      <div class="ftitle2">Media library</div>
+      <div class="fdesc">Visual file browser with drag-and-drop import. Mention files with @ in chat to give the AI context about what to process.</div>
+    </div>
+    <div class="fcell">
+      <div class="ficon-wrap" style="background:var(--red-soft);border-color:rgba(224,48,80,0.18);">
+        <!-- Before/After split — red left, teal right -->
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="12" rx="1.5" fill="none" stroke="#e03050" stroke-width="1"/><line x1="10" y1="4" x2="10" y2="16" stroke="#657a9c" stroke-width="0.8" stroke-dasharray="2 1"/><polygon points="4,8 4,12 7.5,10" fill="#ff4d6a" opacity="0.6"/><polygon points="12.5,8 12.5,12 16,10" fill="#18d8f0" opacity="0.7"/></svg>
+      </div>
+      <div class="ftitle2">Before / After preview</div>
+      <div class="fdesc">See input and output side by side directly in the app — no switching to an external player to check your results.</div>
+    </div>
+    <div class="fcell">
+      <div class="ficon-wrap" style="background:rgba(24,216,240,0.07);border-color:rgba(24,216,240,0.16);">
+        <!-- Globe — indigo outline, cyan equator -->
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" fill="none" stroke="#4a50d8" stroke-width="1"/><ellipse cx="10" cy="10" rx="3.5" ry="7" fill="none" stroke="#6870f0" stroke-width="0.8"/><line x1="3" y1="10" x2="17" y2="10" stroke="#18d8f0" stroke-width="0.9"/><line x1="4" y1="6.5" x2="16" y2="6.5" stroke="#2a70b8" stroke-width="0.7" opacity="0.5"/><line x1="4" y1="13.5" x2="16" y2="13.5" stroke="#2a70b8" stroke-width="0.7" opacity="0.5"/></svg>
+      </div>
+      <div class="ftitle2">Multi-provider AI</div>
+      <div class="fdesc">Groq, Anthropic, OpenAI, Ollama (local), or any OpenAI-compatible endpoint. Switch models from Settings without breaking your workflow.</div>
+    </div>
+  </div>
+</div>
+
+<!-- TOOLS -->
+<div class="alt" id="tools">
+  <div class="alt-inner">
+    <span class="stag">Supported tools</span>
+    <h2 class="stitle">Professional toolchain,<br>zero configuration</h2>
+    <p class="ssub">Vizio detects what's installed. Missing tools can be installed in one click from the Tools page on Windows.</p>
+    <div class="tools-row">
+      <div class="tpill2"><div class="tdot" style="background:#b040e8"></div>ffmpeg</div>
+      <div class="tpill2"><div class="tdot" style="background:#4a50d8"></div>ffprobe</div>
+      <div class="tpill2"><div class="tdot" style="background:#6870f0"></div>OpenAI Whisper</div>
+      <div class="tpill2"><div class="tdot" style="background:#2a70b8"></div>yt-dlp</div>
+      <div class="tpill2"><div class="tdot" style="background:#1a8898"></div>ImageMagick</div>
+      <div class="tpill2"><div class="tdot" style="background:#18d8f0"></div>pyannote</div>
+      <div class="tpill2"><div class="tdot" style="background:#657a9c"></div>Python 3.11</div>
+    </div>
+    <div style="margin-top:52px;">
+      <span class="stag">AI providers</span>
+      <div class="prov-grid">
+        <div class="pcard"><div class="pname">Groq</div><div class="pmodels">llama-3.3-70b<br>mixtral-8x7b</div></div>
+        <div class="pcard" style="border-color:rgba(176,64,232,0.22)"><div class="pname">Anthropic</div><div class="pmodels">claude-opus<br>claude-sonnet</div></div>
+        <div class="pcard" style="border-color:rgba(74,80,216,0.25)"><div class="pname">OpenAI</div><div class="pmodels">gpt-4o<br>gpt-4-turbo</div></div>
+        <div class="pcard" style="border-color:rgba(42,112,184,0.25)"><div class="pname">Ollama</div><div class="pmodels">Any local model<br>no API key needed</div></div>
+        <div class="pcard" style="border-color:rgba(26,136,152,0.25)"><div class="pname">Custom</div><div class="pmodels">OpenAI-compatible<br>any endpoint</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTRIBUTORS -->
+<div class="wrap" id="contributors">
+  <span class="stag">Contributors</span>
+  <h2 class="stitle">Built by</h2>
+  <p class="ssub">The people who designed, built, and shipped Vizio. Pull requests are open.</p>
+  <div class="contrib-grid">
+    <a href="https://github.com/tomladsn" target="_blank" rel="noopener" class="ccard">
+      <div class="cavatar">T</div>
+      <div>
+        <div class="cname">tomladson</div>
+        <div class="chandle">@tomladsn</div>
+        <div class="crole">Creator &amp; Lead Developer</div>
+      </div>
+      <div class="cgh-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="var(--text2)"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg></div>
+    </a>
+    <div class="ccard-ghost">
+      <div class="cgh-ring"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 3v9M3 7.5h9" stroke="#384055" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+      <div>
+        <div style="font-family:var(--font-sans);font-size:14px;font-weight:700;color:var(--text3);">Your name here</div>
+        <div style="font-family:var(--font-mono);font-size:10.5px;color:var(--text3);margin-top:3px;">Open a pull request →</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CTA -->
+<div class="alt">
+  <div class="cta-wrap" style="background:transparent;">
+    <div class="cta-glow"></div>
+    <div class="cta-inner">
+      <h2>Stop scripting.<br><em>Start describing.</em></h2>
+      <p class="cta-sub">Vizio is open source, free, and built for Windows. Clone it, open a project, and tell it what you need done.</p>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <div class="btn-p-wrap" id="downloadWrap2">
+          <button class="btn-p" id="downloadBtn2" type="button">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5.5" height="5.5" rx="0.5" fill="white" opacity="0.9"/><rect x="7.5" y="1" width="5.5" height="5.5" rx="0.5" fill="white" opacity="0.9"/><rect x="1" y="7.5" width="5.5" height="5.5" rx="0.5" fill="white" opacity="0.9"/><rect x="7.5" y="7.5" width="5.5" height="5.5" rx="0.5" fill="white" opacity="0.9"/></svg>
+            Download
+            <span class="btn-p-divider"></span>
+            <span class="btn-p-arrow"><svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1L5.5 6L10 1" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <div class="platform-dropdown" id="platformDrop2">
+            <a class="plat-item" href="https://github.com/tomladsn/Vizio-app" target="_blank" rel="noopener"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6.5" height="6.5" rx="0.6" fill="#c9d3e8"/><rect x="8.5" y="1" width="6.5" height="6.5" rx="0.6" fill="#c9d3e8"/><rect x="1" y="8.5" width="6.5" height="6.5" rx="0.6" fill="#c9d3e8"/><rect x="8.5" y="8.5" width="6.5" height="6.5" rx="0.6" fill="#c9d3e8"/></svg>Windows<span class="plat-badge badge-avail">Available</span></a>
+            <div class="plat-item" style="cursor:default;opacity:.55;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5C4.4 1.5 1.5 4.4 1.5 8s2.9 6.5 6.5 6.5 6.5-2.9 6.5-6.5S11.6 1.5 8 1.5zM8 3c.8 0 1.5.3 2.1.8L3.8 10.1C3.3 9.5 3 8.8 3 8c0-2.8 2.2-5 5-5zm0 10c-.8 0-1.5-.3-2.1-.8l6.3-6.3c.5.6.8 1.3.8 2.1 0 2.8-2.2 5-5 5z" fill="#6a7d9e"/></svg>macOS<span class="plat-badge badge-soon">Coming soon</span></div>
+            <div class="plat-item" style="cursor:default;opacity:.55;"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" fill="none" stroke="#6a7d9e" stroke-width="1.1"/><path d="M8 3v10M3 8h10" stroke="#6a7d9e" stroke-width="1"/></svg>Linux<span class="plat-badge badge-soon">Coming soon</span></div>
+          </div>
+        </div>
+        <a href="https://github.com/tomladsn/Vizio-app/blob/main/README.md" target="_blank" rel="noopener" class="btn-s">Read the docs →</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="flogo">Vizio</div>
+  <div class="fright">MIT License &nbsp;·&nbsp; <a href="https://github.com/tomladsn/Vizio-app" target="_blank" rel="noopener">github.com/tomladsn/Vizio-app</a></div>
+</footer>
+
+<script>
+/* ── Hero canvas: Neural-network ribbon animation ─── */
+(function(){
+  const canvas = document.getElementById('hero-canvas');
+  if(!canvas) return;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduceMotion){
+    canvas.style.display = 'none';
+    return;
+  }
+  const ctx = canvas.getContext('2d');
+  const hero = canvas.parentElement;
+  const isCoarse = window.matchMedia('(pointer: coarse)').matches;
+  let cssW = 0, cssH = 0, dpr = 1;
+
+  // Mouse tracking
+  let mouse = {x: -9999, y: -9999};
+  if(!isCoarse){
+    canvas.addEventListener('mousemove', e=>{
+      const r = canvas.getBoundingClientRect();
+      mouse.x = (e.clientX - r.left) * dpr;
+      mouse.y = (e.clientY - r.top) * dpr;
+    });
+    canvas.addEventListener('mouseleave', ()=>{ mouse.x = -9999; mouse.y = -9999; });
+  }
+
+  // Palette
+  const PALETTE = [
+    [224, 48,  80],   // red
+    [176, 64,  232],  // magenta
+    [74,  80,  216],  // indigo
+    [42,  112, 184],  // steel
+    [24,  216, 240],  // cyan
+    [200, 80,  160],  // pink-mag
+  ];
+
+  // Glow orbs — slow drifting light blobs
+  const ORBS = [
+    {nx:.12,ny:.35,r:.38,c:[176,64,232], op:.18,sx:.00009,sy:.00005},
+    {nx:.50,ny:.18,r:.32,c:[74,80,216],  op:.15,sx:.00005,sy:.00009},
+    {nx:.85,ny:.45,r:.30,c:[42,112,184], op:.12,sx:-.00007,sy:.00006},
+    {nx:.30,ny:.72,r:.24,c:[24,216,240], op:.10,sx:.00006,sy:-.00005},
+    {nx:.65,ny:.68,r:.20,c:[224,48,80],  op:.11,sx:.00008,sy:-.00007},
+  ];
+
+  // Nodes
+  let nodes = [];
+  function initNodes(){
+    nodes = [];
+    const W = canvas.width, H = canvas.height;
+    const density = isCoarse ? 30000 : 18000;
+    const maxNodes = isCoarse ? 34 : 58;
+    const count = Math.min(maxNodes, Math.floor((cssW*cssH)/density));
+    for(let i=0;i<count;i++){
+      const c = PALETTE[Math.floor(Math.random()*PALETTE.length)];
+      nodes.push({
+        x: Math.random()*W, y: Math.random()*H,
+        vx:(Math.random()-.5)*.28, vy:(Math.random()-.5)*.22,
+        r: Math.random()*1.6+0.6,
+        op: Math.random()*.55+.2,
+        c, phase: Math.random()*Math.PI*2,
+        // connection color index — pick nearest gradient stop
+        ci: Math.floor(Math.random()*PALETTE.length),
+      });
+    }
+  }
+
+  function resize(){
+    cssW = hero.offsetWidth;
+    cssH = hero.offsetHeight;
+    dpr = Math.min(window.devicePixelRatio || 1, isCoarse ? 1 : 1.5);
+    canvas.width  = Math.floor(cssW * dpr);
+    canvas.height = Math.floor(cssH * dpr);
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    initNodes();
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const LINK_DIST   = 160;   // max distance for a connection line
+  const MOUSE_REPEL = 120;   // mouse repulsion radius
+  const MOUSE_FORCE = 0.012; // how hard the mouse pushes
+
+  function lerpColor(a, b, t){
+    return [
+      Math.round(a[0]+(b[0]-a[0])*t),
+      Math.round(a[1]+(b[1]-a[1])*t),
+      Math.round(a[2]+(b[2]-a[2])*t),
+    ];
+  }
+
+  function draw(ts){
+    const t  = ts * 0.001;
+    const W  = canvas.width, H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+
+    /* 1 — Draw background glow orbs */
+    ORBS.forEach((o,i)=>{
+      const ox = (o.nx + Math.sin(t*o.sx*900+i*1.7)*.13)*W;
+      const oy = (o.ny + Math.cos(t*o.sy*900+i*2.3)*.10)*H;
+      const r  = o.r * Math.min(W,H);
+      const g  = ctx.createRadialGradient(ox,oy,0,ox,oy,r);
+      g.addColorStop(0,   `rgba(${o.c},${o.op})`);
+      g.addColorStop(0.4, `rgba(${o.c},${(o.op*.3).toFixed(3)})`);
+      g.addColorStop(1,   `rgba(${o.c},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(ox,oy,r,0,Math.PI*2); ctx.fill();
+    });
+
+    /* 2 — Update node positions */
+    nodes.forEach(p=>{
+      // Mouse repulsion
+      const dx = p.x - mouse.x;
+      const dy = p.y - mouse.y;
+      const md = Math.sqrt(dx*dx+dy*dy);
+      if(md < MOUSE_REPEL && md > 0){
+        const force = (1 - md/MOUSE_REPEL) * MOUSE_FORCE;
+        p.vx += (dx/md) * force;
+        p.vy += (dy/md) * force;
+      }
+      // Damping
+      p.vx *= 0.98; p.vy *= 0.98;
+      p.x += p.vx; p.y += p.vy;
+      if(p.x < 0) p.x = W; if(p.x > W) p.x = 0;
+      if(p.y < 0) p.y = H; if(p.y > H) p.y = 0;
+    });
+
+    /* 3 — Draw connection lines (bezier ribbons) */
+    for(let i=0; i<nodes.length; i++){
+      for(let j=i+1; j<nodes.length; j++){
+        const a = nodes[i], b = nodes[j];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const dist = Math.sqrt(dx*dx+dy*dy);
+        if(dist > LINK_DIST) continue;
+        const alpha = (1 - dist/LINK_DIST) * 0.32;
+        // Blend node colors along the line
+        const ca = a.c, cb = b.c;
+        const lg = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+        lg.addColorStop(0,   `rgba(${ca},${(alpha*0.6).toFixed(3)})`);
+        lg.addColorStop(0.5, `rgba(${lerpColor(ca,cb,0.5)},${alpha.toFixed(3)})`);
+        lg.addColorStop(1,   `rgba(${cb},${(alpha*0.6).toFixed(3)})`);
+        // Bezier control point — slight curve based on midpoint
+        const mx = (a.x+b.x)/2 + Math.sin(t*0.4+i*0.7)*18;
+        const my = (a.y+b.y)/2 + Math.cos(t*0.4+j*0.5)*14;
+        ctx.strokeStyle = lg;
+        ctx.lineWidth   = (1 - dist/LINK_DIST)*1.4;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.quadraticCurveTo(mx, my, b.x, b.y);
+        ctx.stroke();
+      }
+    }
+
+    /* 4 — Draw nodes */
+    nodes.forEach(p=>{
+      const pulse = (Math.sin(t*1.3+p.phase)+1)*.5;
+      const op = p.op * (.55 + pulse*.45);
+      const r  = p.r  * (.8  + pulse*.3);
+      // Outer glow
+      const gn = ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r*4);
+      gn.addColorStop(0,  `rgba(${p.c},${(op*.5).toFixed(3)})`);
+      gn.addColorStop(1,  `rgba(${p.c},0)`);
+      ctx.fillStyle = gn;
+      ctx.beginPath(); ctx.arc(p.x,p.y,r*4,0,Math.PI*2); ctx.fill();
+      // Core dot
+      ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2);
+      ctx.fillStyle = `rgba(${p.c},${op.toFixed(3)})`;
+      ctx.fill();
+    });
+
+    /* 5 — Mouse cursor halo */
+    if(mouse.x > 0){
+      const mg = ctx.createRadialGradient(mouse.x,mouse.y,0,mouse.x,mouse.y,90);
+      mg.addColorStop(0,   'rgba(176,64,232,0.10)');
+      mg.addColorStop(0.5, 'rgba(74,80,216,0.05)');
+      mg.addColorStop(1,   'rgba(24,216,240,0)');
+      ctx.fillStyle = mg;
+      ctx.beginPath(); ctx.arc(mouse.x,mouse.y,90,0,Math.PI*2); ctx.fill();
+    }
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+})();
+
+/* ── Platform dropdown ─────────────────────────────── */
+/* Mobile menu */
+(function(){
+  const toggle = document.querySelector('.nav-toggle');
+  const links = document.getElementById('nav-links');
+  if(!toggle || !links) return;
+
+  function setOpen(open){
+    document.body.classList.toggle('nav-open', open);
+    toggle.setAttribute('aria-expanded', String(open));
+    toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  }
+
+  toggle.addEventListener('click', ()=>setOpen(!document.body.classList.contains('nav-open')));
+  links.addEventListener('click', e=>{
+    if(e.target.closest('a')) setOpen(false);
+  });
+  window.addEventListener('resize', ()=>{
+    if(window.innerWidth > 760) setOpen(false);
+  }, {passive:true});
+  document.addEventListener('keydown', e=>{
+    if(e.key === 'Escape') setOpen(false);
+  });
+})();
+
+function setupDropdown(btnId, wrapId, dropId){
+  const btn  = document.getElementById(btnId);
+  const wrap = document.getElementById(wrapId);
+  const drop = document.getElementById(dropId);
+  if(!btn||!drop) return;
+
+  btn.addEventListener('click', function(e){
+    e.stopPropagation();
+    drop.classList.toggle('open');
+  });
+  document.addEventListener('click', function(e){
+    if(!wrap.contains(e.target)) drop.classList.remove('open');
+  });
+}
+
+setupDropdown('downloadBtn',  'downloadWrap',  'platformDrop');
+setupDropdown('downloadBtn2', 'downloadWrap2', 'platformDrop2');
+
+/* ── Scroll reveal ─────────────────────────────────── */
+(function(){
+  // Add sr classes to elements
+  const sections = [
+    {sel:'.hcell',   cls:'sr',      delay:true},
+    {sel:'.fcell',   cls:'sr',      delay:true},
+    {sel:'.pcard',   cls:'sr-scale',delay:true},
+    {sel:'.ccard',   cls:'sr',      delay:true},
+    {sel:'.ccard-ghost', cls:'sr',  delay:false},
+    {sel:'.stitle',  cls:'sr-left', delay:false},
+    {sel:'.ssub',    cls:'sr',      delay:false},
+    {sel:'.stag',    cls:'sr',      delay:false},
+    {sel:'.app-frame', cls:'sr-scale', delay:false},
+    {sel:'.cta-inner', cls:'sr',    delay:false},
+    {sel:'.tpill2',  cls:'sr-scale',delay:true},
+  ];
+
+  sections.forEach(({sel, cls, delay})=>{
+    document.querySelectorAll(sel).forEach((el, i)=>{
+      el.classList.add(cls);
+      if(delay) el.style.transitionDelay = (i * 0.08) + 's';
+    });
+  });
+
+  // Observe
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        e.target.classList.add('visible');
+        io.unobserve(e.target);
+      }
+    });
+  }, {threshold: 0.12});
+
+  document.querySelectorAll('.sr, .sr-left, .sr-scale').forEach(el=>io.observe(el));
+})();
+
+/* ── Subtle parallax on hero inner ─────────────────── */
+(function(){
+  const heroInner = document.querySelector('.hero-inner');
+  if(!heroInner) return;
+  window.addEventListener('scroll', ()=>{
+    const y = window.scrollY;
+    heroInner.style.transform = `translateY(${y * 0.18}px)`;
+    heroInner.style.opacity   = Math.max(0, 1 - y/600);
+  }, {passive:true});
+})();
+</script>
+</body>
+</html>
