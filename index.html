@@ -176,13 +176,23 @@ nav{
 
 /* Status badge — deliberate, not generic */
 .hero-badge{
-  display:inline-flex;align-items:center;gap:6px;
-  font-family:var(--font-mono);font-size:10px;font-weight:500;
-  color:var(--t2);letter-spacing:.1em;text-transform:uppercase;
-  border:1px solid var(--bdr2);
-  padding:5px 13px 5px 10px;border-radius:20px;margin-bottom:32px;
-  background:rgba(6,8,14,0.55);backdrop-filter:blur(10px);
-  position:relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--t2);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    border: 1px solid var(--bdr2);
+    padding: 5px 13px 5px 10px;
+    border-radius: 20px;
+    margin-bottom: 32px;
+    background: rgba(6, 8, 14, 0.55);
+    backdrop-filter: blur(10px);
+    position: relative;
+    bottom: 20px;
 }
 /* Animated border glow */
 .hero-badge::before{
@@ -204,14 +214,15 @@ nav{
 
 /* HEADLINE — real typographic craft */
 .hero-h1{
-  font-family:var(--font-head);
-  font-size:clamp(52px,8.5vw,100px);
-  font-weight:800;
-  line-height:.95;
-  letter-spacing:-.04em;
-  color:#dde5f8;
-  margin-bottom:22px;
-  max-width:860px;
+    font-family: var(--font-head);
+    font-size: clamp(42px, 8.5vw, 100px);
+    font-weight: 800;
+    line-height: .95;
+    letter-spacing: -.04em;
+    color: #dde5f8;
+    position: relative;
+    max-width: 860px;
+    bottom: 25px;
 }
 .hero-h1 .line2{
   display:block;
@@ -571,7 +582,66 @@ nav{
 .ft{font-family:var(--font-head);font-size:14.5px;font-weight:700;color:var(--t1);margin-bottom:7px;letter-spacing:-.01em;}
 .fd{font-size:13px;color:var(--t2);line-height:1.65;font-weight:300;}
 
-/* ── TOOLS ── */
+/* ── SECURITY SECTION ── */
+.sec-step{display:flex;align-items:flex-start;gap:14px;}
+.sec-step-ico{width:36px;height:36px;border-radius:9px;border:1px solid;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;}
+.sec-step-title{font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--t1);margin-bottom:5px;letter-spacing:-.01em;}
+.sec-step-body{font-size:13px;color:var(--t2);line-height:1.68;font-weight:300;}
+
+/* Flow diagram */
+.flow-row{display:flex;align-items:flex-start;gap:12px;padding:8px 0;position:relative;}
+.flow-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.flow-line{
+  position:absolute;left:3.5px;top:16px;bottom:-8px;
+  width:1px;background:rgba(150,100,200,.15);
+}
+.flow-label{font-size:11.5px;color:var(--t2);line-height:1.5;}
+.flow-sub{font-size:10.5px;color:var(--t3);margin-top:2px;font-family:var(--font-mono);}
+.flow-code{font-family:var(--font-mono);font-size:10.5px;color:var(--ind3);background:rgba(74,80,216,.08);padding:1px 5px;border-radius:3px;}
+.flow-highlight .flow-label{color:var(--t1);}
+
+/* ── MOBILE NAV ── */
+.nav-mb{
+  display:none;width:36px;height:36px;background:none;
+  border:1px solid var(--bdr2);border-radius:7px;cursor:pointer;
+  align-items:center;justify-content:center;color:var(--t1);
+  flex-shrink:0;
+}
+/* Nav links hidden on mobile by default, shown when open */
+@media(max-width:760px){
+  .nav-mb{display:flex;}
+  .nav-links{
+    position:fixed;top:54px;left:0;right:0;
+    display:flex!important;flex-direction:column;align-items:stretch;gap:0;
+    background:rgba(6,8,14,.97);
+    border-bottom:1px solid var(--bdr2);
+    box-shadow:0 24px 60px rgba(0,0,0,.5);
+    padding:8px 0 16px;
+    /* hidden state */
+    opacity:0;visibility:hidden;pointer-events:none;
+    transform:translateY(-8px);
+    transition:opacity .18s,transform .18s,visibility .18s;
+    z-index:290;
+  }
+  .nav-links.mob-open{
+    opacity:1;visibility:visible;pointer-events:auto;
+    transform:translateY(0);
+  }
+  .nav-links li{border-bottom:1px solid rgba(150,100,200,.07);}
+  .nav-links li:last-child{border:none;padding-top:8px;}
+  .nav-links a{
+    display:flex;align-items:center;
+    min-height:44px;padding:0 20px;
+    font-size:15px;color:var(--t1);
+  }
+  .nav-gh{
+    margin:0 12px!important;
+    justify-content:center!important;
+    min-height:40px!important;
+    background:rgba(24,216,240,.06)!important;
+    border-radius:6px!important;
+  }
+}
 .tools-row{margin-top:40px;display:flex;flex-wrap:wrap;gap:6px;}
 .tpill{
   font-family:var(--font-mono);font-size:11px;
@@ -675,6 +745,7 @@ footer a:hover{color:var(--t2);}
   .prov-layout{grid-template-columns:1fr;}
   .prov-lede{position:static;}
   .prov-grid{grid-template-columns:1fr 1fr;}
+  .sec-two-col{grid-template-columns:1fr!important;}
   .feat-grid{grid-template-columns:1fr 1fr;}
   footer{padding:20px;flex-direction:column;gap:10px;text-align:center;}
   .cta-card{padding:48px 24px;}
@@ -698,7 +769,7 @@ footer a:hover{color:var(--t2);}
 <!-- NAV -->
 <nav>
   <a href="#" class="nav-logo">
-    <img src="./build/icon.png" alt="" width="24" height="24" decoding="async">
+    <img src="./vizio-logo.png" alt="" width="24" height="24" decoding="async">
     Vizio
   </a>
   <button class="nav-mb" type="button" aria-label="Menu">
@@ -708,6 +779,7 @@ footer a:hover{color:var(--t2);}
     <li><a href="#how">How it works</a></li>
     <li><a href="#features">Features</a></li>
     <li><a href="#providers">Providers</a></li>
+    <li><a href="#security">Security</a></li>
     <li><a href="#contributors">Contributors</a></li>
     <li><a href="https://github.com/tomladsn/Vizio-app" target="_blank" rel="noopener" class="nav-gh">GitHub ↗</a></li>
   </ul>
@@ -780,10 +852,7 @@ footer a:hover{color:var(--t2);}
       <a href="https://github.com/tomladsn/Vizio-app" target="_blank" rel="noopener" class="btn-ghost">View on GitHub →</a>
     </div>
 
-    <div class="scroll-hint fu d4">
-      <span>scroll</span>
-      <svg width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1l4.5 5L10 1" stroke="#32415a" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </div>
+
   </div>
 </section>
 
@@ -1088,14 +1157,6 @@ footer a:hover{color:var(--t2);}
             <div class="pfree">Free tier available</div>
             <div class="pspeed">⚡ ~315 tk/s · LPU inference</div>
           </div>
-          <!-- Cerebras -->
-          <div class="pcard" style="border-color:rgba(24,216,240,.18);">
-            <div class="pcard-accent" style="background:#18d8f0;box-shadow:0 0 10px rgba(24,216,240,.35);"></div>
-            <div class="pn">Cerebras</div>
-            <div class="pm">llama-3.3-70b<br>llama-3.1-8b</div>
-            <div class="pfree">Free tier available</div>
-            <div class="pspeed">⚡ up to 2000 tk/s</div>
-          </div>
           <!-- Google AI -->
           <div class="pcard" style="border-color:rgba(42,112,184,.2);">
             <div class="pcard-accent" style="background:#2a70b8;"></div>
@@ -1104,13 +1165,13 @@ footer a:hover{color:var(--t2);}
             <div class="pfree">1,500 req/day free</div>
             <div class="pspeed">Multimodal · 1M context</div>
           </div>
-          <!-- SambaNova -->
+          <!-- OpenRouter -->
           <div class="pcard">
             <div class="pcard-accent" style="background:#e0304e;"></div>
-            <div class="pn">SambaNova</div>
-            <div class="pm">llama-3.3-70b<br>Qwen 2.5</div>
+            <div class="pn">OpenRouter</div>
+            <div class="pm">100+ models<br>Claude · GPT · Gemini</div>
             <div class="pfree">Free tier available</div>
-            <div class="pspeed">⚡ ~200 tk/s · RDU chips</div>
+            <div class="pspeed">Model aggregator · unified API</div>
           </div>
           <!-- Anthropic -->
           <div class="pcard" style="border-color:rgba(174,62,228,.18);">
@@ -1173,6 +1234,58 @@ footer a:hover{color:var(--t2);}
           <div style="font-family:var(--font-head);font-size:13.5px;font-weight:700;color:var(--t3);">Your name here</div>
           <div style="font-family:var(--font-mono);font-size:10px;color:var(--t3);margin-top:3px;">Open a pull request →</div>
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECURITY -->
+<section class="sec" id="security">
+  <div class="sec-inner">
+    <span class="tag sr">Security</span>
+    <h2 class="h2 sr">Your API keys never leave your machine</h2>
+    <p class="lead sr">Keys are encrypted by your operating system the moment you save them. Vizio never stores them in plain text — not in a file, not in a database, not anywhere on disk.</p>
+
+    <div class="sec-two-col sr-s" style="margin-top:52px;display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start;">
+
+      <!-- Left: plain-language explainer -->
+      <div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+
+          <div class="sec-step">
+            <div class="sec-step-ico" style="background:rgba(224,48,80,.1);border-color:rgba(224,48,80,.2);">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4v4c0 3.3 2.5 6.4 6 7 3.5-.6 6-3.7 6-7V4L8 1z" stroke="#ff4d68" stroke-width="1" fill="none" stroke-linejoin="round"/><path d="M5.5 8l2 2L11 6" stroke="#ff4d68" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <div class="sec-step-title">You type your key in Settings</div>
+              <div class="sec-step-body">Vizio immediately hands it to Windows — not to any file or database. Windows encrypts it using your user account as the lock. Only your login can ever open it.</div>
+            </div>
+          </div>
+
+          <div class="sec-step">
+            <div class="sec-step-ico" style="background:rgba(74,80,216,.1);border-color:rgba(74,80,216,.2);">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="#6570f0" stroke-width="1" fill="none"/><path d="M5 7V5a3 3 0 016 0v2" stroke="#6570f0" stroke-width="1" stroke-linecap="round"/></svg>
+            </div>
+            <div>
+              <div class="sec-step-title">When you send a message</div>
+              <div class="sec-step-body">Vizio asks Windows to decrypt the key for a fraction of a second — just long enough to attach it to the outgoing request. The instant the request fires, the key is gone from memory.</div>
+            </div>
+          </div>
+
+          <div class="sec-step">
+            <div class="sec-step-ico" style="background:rgba(26,136,152,.1);border-color:rgba(26,136,152,.2);">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#18d8f0" stroke-width="1" fill="none"/><path d="M5 8l2 2 4-4" stroke="#18d8f0" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div>
+              <div class="sec-step-title">The response comes back</div>
+              <div class="sec-step-body">Your key was never written to disk, never logged, never stored anywhere a process or another app could read it. Vizio itself can't read its own saved keys without your OS unlocking them.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Right: the technical flow as a visual -->
       </div>
     </div>
   </div>
@@ -1345,6 +1458,33 @@ footer a:hover{color:var(--t2);}
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+})();
+
+/* ── Mobile nav toggle ─────────────────────────────── */
+(function(){
+  const btn = document.querySelector('.nav-mb');
+  const links = document.querySelector('.nav-links');
+  if(!btn || !links) return;
+
+  function open(){ links.classList.add('mob-open'); btn.setAttribute('aria-expanded','true'); document.body.style.overflow='hidden'; }
+  function close(){ links.classList.remove('mob-open'); btn.setAttribute('aria-expanded','false'); document.body.style.overflow=''; }
+  function toggle(){ links.classList.contains('mob-open') ? close() : open(); }
+
+  btn.addEventListener('click', e=>{ e.stopPropagation(); toggle(); });
+
+  // Close when a nav link is tapped
+  links.querySelectorAll('a').forEach(a=>a.addEventListener('click', close));
+
+  // Close on outside tap
+  document.addEventListener('click', e=>{
+    if(!btn.contains(e.target) && !links.contains(e.target)) close();
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
+
+  // Close on resize to desktop
+  window.addEventListener('resize', ()=>{ if(window.innerWidth > 760) close(); }, {passive:true});
 })();
 
 /* ── Dropdown ─────────────────────────────────────── */
