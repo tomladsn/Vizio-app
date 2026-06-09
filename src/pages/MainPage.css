@@ -10,6 +10,7 @@
 .main-body {
   flex: 1;
   display: flex;
+  flex-wrap: nowrap;
   overflow: hidden;
   min-height: 0;
 }
@@ -148,3 +149,33 @@
 
 .file-row:hover .file-mention-btn { opacity: 1; }
 .file-mention-btn:hover { background: var(--green-dim); color: var(--green-text); border-color: var(--green-border); }
+
+/* ── Drag-to-resize handles ──────────────────────────────────────────────── */
+.resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  background: var(--border);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+  transition: background 0.15s;
+}
+
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  left: -3px;
+  right: -3px;
+}
+
+.resize-handle:hover {
+  background: var(--blue, #3b82f6);
+}
+
+body.dragging-panel * {
+  pointer-events: none !important;
+}
+body.dragging-panel .resize-handle {
+  pointer-events: auto !important;
+}

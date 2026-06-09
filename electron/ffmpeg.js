@@ -69,7 +69,7 @@ function parseProgress(line, durationSec) {
 }
 
 // ─── Run ffmpeg with real-time progress ──────────────────────────────────────
-export function runFfmpeg(command, { onProgress, durationSec, signal } = {}) {
+export function runFfmpeg(command, { onProgress, onOutput, durationSec, signal } = {}) {
   return new Promise((resolve) => {
     const cmd     = cleanCommand(command)
     const parts   = cmd.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? []
@@ -94,18 +94,27 @@ export function runFfmpeg(command, { onProgress, durationSec, signal } = {}) {
 
     const abortHandler = () => {
       try {
-        proc.kill('SIGTERM')
+        if (process.platform === 'win32' && proc.pid) {
+          exec(`taskkill /F /T /PID ${proc.pid}`, () => {})
+        } else {
+          proc.kill('SIGTERM')
+        }
       } catch (_) {}
       finish({ command: cmd, success: false, stdout, stderr, error: 'Cancelled' })
     }
 
     signal?.addEventListener?.('abort', abortHandler, { once: true })
 
-    proc.stdout.on('data', chunk => { stdout += chunk.toString() })
+    proc.stdout.on('data', chunk => {
+      const text = chunk.toString()
+      stdout += text
+      onOutput?.({ stream: 'stdout', text })
+    })
 
     proc.stderr.on('data', chunk => {
       const text = chunk.toString()
       stderr += text
+      onOutput?.({ stream: 'stderr', text })
       if (onProgress) {
         const pct = parseProgress(text, durationSec)
         if (pct !== null) onProgress(pct)
@@ -582,10 +591,58 @@ export function createLogger(sessionId) {
       if (status === 'in_progress') data.completedAt = null
       save()
     },
+    startAttempt(stepId, command) {
+      const record = data.steps.find(s => s.id === stepId)
+      if (!record) return
+      // Clear any previous running attempt if it somehow got stuck, or reuse it
+      const running = record.attempts.find(att => att.status === 'running')
+      if (running) {
+        running.command = command
+        running.stdout = ''
+        running.stderr = ''
+        running.at = new Date().toISOString()
+      } else {
+        record.attempts.push({
+          command,
+          stdout: '',
+          stderr: '',
+          status: 'running',
+          at: new Date().toISOString()
+        })
+      }
+      save()
+    },
+    updateAttemptOutput(stepId, stream, text) {
+      const record = data.steps.find(s => s.id === stepId)
+      if (!record) return
+      const running = record.attempts.find(att => att.status === 'running')
+      if (running) {
+        if (stream === 'stdout') {
+          running.stdout = (running.stdout || '') + text
+        } else {
+          running.stderr = (running.stderr || '') + text
+        }
+        save()
+      }
+    },
     recordAttempt(stepId, attempt) {
       const record = data.steps.find(s => s.id === stepId)
       if (!record) return
-      record.attempts.push({ ...attempt, at: new Date().toISOString() })
+      const running = record.attempts.find(att => att.status === 'running')
+      if (running) {
+        // Merge the final attempt details into the running attempt
+        Object.assign(running, attempt, {
+          status: attempt.exitSuccess ? 'completed' : 'failed',
+          completedAt: new Date().toISOString()
+        })
+      } else {
+        // Fallback: create a new record
+        record.attempts.push({
+          ...attempt,
+          status: attempt.exitSuccess ? 'completed' : 'failed',
+          completedAt: new Date().toISOString()
+        })
+      }
       record.status = attempt.aiSuccess ? 'completed' : 'failed'
       save()
     },

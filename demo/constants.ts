@@ -1,17 +1,17 @@
 export const FPS          = 30
-export const W            = 1280
-export const H            = 720
+export const W            = 1920
+export const H            = 1080
 export const DURATION_SCALE = 1
 
 // Scene durations in frames
 export const SCENE = {
   INTRO:       Math.round(12 * FPS * DURATION_SCALE),   // 390  — aurora + logo + pain statement + tagline (voiceover synced)
   PROJECT_GATE: Math.round(3 * FPS * DURATION_SCALE),   // 150  — welcome back screen
-  WORKSPACE:    Math.round(6  * FPS * DURATION_SCALE),   // 180  — three-panel layout reveal
-  CHAT:         Math.round(6  * FPS * DURATION_SCALE),   // 180  — typing + thinking
-  WORKFLOW:     Math.round(5  * FPS * DURATION_SCALE),   // 150  — approval card
-  EXECUTING:    Math.round(7  * FPS * DURATION_SCALE),   // 210  — progress bars
-  SESSION_LOG:  Math.round(4  * FPS * DURATION_SCALE),   // 120  — session log steps
+  WORKSPACE:    Math.round(3  * FPS * DURATION_SCALE),   // 180  — three-panel layout reveal
+  CHAT:         Math.round(3  * FPS * DURATION_SCALE),   // 180  — typing + thinking
+  WORKFLOW:     Math.round(3  * FPS * DURATION_SCALE),   // 150  — approval card
+  EXECUTING:    Math.round(3  * FPS * DURATION_SCALE),   // 210  — progress bars
+  SESSION_LOG:  Math.round(3  * FPS * DURATION_SCALE),   // 120  — session log steps
   SETTINGS:     Math.round(4  * FPS * DURATION_SCALE),   // 120  — settings page
   OUTRO:        Math.round(5  * FPS * DURATION_SCALE),   // 150  — CTA
 }

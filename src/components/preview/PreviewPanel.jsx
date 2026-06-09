@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import './PreviewPanel.css'
 
 export default function PreviewPanel({ project, activeFile, sessionId, onMentionFile }) {
@@ -9,6 +9,12 @@ export default function PreviewPanel({ project, activeFile, sessionId, onMention
   const [outputFiles,    setOutputFiles]    = useState([])
   const [afterFile,      setAfterFile]      = useState(null)
   const [pollError,      setPollError]      = useState(null)
+  const [seekTime,       setSeekTime]       = useState(null)
+
+  // Before/After split resize
+  const [beforePct, setBeforePct]   = useState(50)
+  const splitRef                    = useRef(null)
+  const splitDraggingRef            = useRef(null)
 
   // ── New session arrived ────────────────────────────────────────────────────
   useEffect(() => {
@@ -82,6 +88,53 @@ export default function PreviewPanel({ project, activeFile, sessionId, onMention
     }
   }
 
+  async function handleDeleteOutput(filePath) {
+    if (!confirm('Are you sure you want to delete this output file?')) return
+    const res = await window.electron.project.deleteMedia(filePath, project.folderPath)
+    if (res?.ok) {
+      const files = await window.electron.project.getOutputs(project.folderPath)
+      setOutputFiles(files ?? [])
+      if (afterFile?.path === filePath) {
+        setAfterFile(null)
+      }
+    } else {
+      alert(`Delete failed: ${res?.message || 'Unknown error'}`)
+    }
+  }
+
+  // Before/After pane drag-to-resize
+  function onSplitMouseDown(e) {
+    e.preventDefault()
+    const rect = splitRef.current?.getBoundingClientRect()
+    if (!rect) return
+    splitDraggingRef.current = { startX: e.clientX, startPct: beforePct, totalW: rect.width }
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }
+
+  useEffect(() => {
+    function onMouseMove(e) {
+      if (!splitDraggingRef.current) return
+      const { startX, startPct, totalW } = splitDraggingRef.current
+      const delta = e.clientX - startX
+      const deltaPct = (delta / totalW) * 100
+      const newPct = Math.min(80, Math.max(20, startPct + deltaPct))
+      setBeforePct(newPct)
+    }
+    function onMouseUp() {
+      if (!splitDraggingRef.current) return
+      splitDraggingRef.current = null
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [])
+
   return (
     <div className="preview-panel">
       <div className="preview-tabs">
@@ -102,11 +155,20 @@ export default function PreviewPanel({ project, activeFile, sessionId, onMention
         ))}
       </div>
 
-      {/* ── Preview tab ───────────────────────────────────────────────────── */}
+      {/* ── Preview tab ─────────────────────────────────────────────────── */}
       {activeTab === 'preview' && (
-        <div className="preview-split">
-          <VideoPane label="BEFORE" file={activeFile} projectDir={project?.folderPath} />
-          <VideoPane label="AFTER"  file={afterFile} projectDir={project?.folderPath} processed={!!afterFile} />
+        <div className="preview-split" ref={splitRef}>
+          <div style={{ width: `${beforePct}%`, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+            <VideoPane label="BEFORE" file={activeFile} projectDir={project?.folderPath} seekTime={seekTime} setSeekTime={setSeekTime} />
+          </div>
+          <div
+            className="preview-split-handle"
+            onMouseDown={onSplitMouseDown}
+            title="Drag to resize"
+          />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+            <VideoPane label="AFTER"  file={afterFile} projectDir={project?.folderPath} processed={!!afterFile} seekTime={seekTime} setSeekTime={setSeekTime} />
+          </div>
         </div>
       )}
 
@@ -151,6 +213,13 @@ export default function PreviewPanel({ project, activeFile, sessionId, onMention
                     onClick={() => window.electron.openFile(f.path)}
                   >
                     open
+                  </button>
+                  <button
+                    className="of-btn delete-btn"
+                    title="Delete output file"
+                    onClick={() => handleDeleteOutput(f.path)}
+                  >
+                    delete
                   </button>
                 </div>
               </div>
@@ -245,6 +314,12 @@ function StepLog({ step }) {
     cancelled: 'var(--amber-text)',
   }[step.status] ?? 'var(--text-muted)'
 
+  useEffect(() => {
+    if (step.status === 'running') {
+      setExpanded(true)
+    }
+  }, [step.status])
+
   const hasDetail = step.attempts?.length > 0
 
   return (
@@ -273,10 +348,39 @@ function StepLog({ step }) {
   )
 }
 
+function TerminalOutput({ stdout, stderr, isRunning }) {
+  const terminalRef = React.useRef(null)
+
+  useEffect(() => {
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight
+    }
+  }, [stdout, stderr])
+
+  return (
+    <div className="slog-terminal-container" ref={terminalRef}>
+      {stdout && <pre className="stdout-line">{stdout}</pre>}
+      {stderr && <pre className="stderr-line">{stderr}</pre>}
+      {isRunning && !stdout && !stderr && (
+        <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Waiting for output...</span>
+      )}
+    </div>
+  )
+}
+
 function AttemptLog({ attempt, num }) {
+  const isRunning = attempt.status === 'running'
   return (
     <div className="slog-attempt">
-      <div className="slog-attempt-num">attempt {num}</div>
+      <div className="slog-attempt-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="slog-attempt-num">attempt {num}</div>
+        {isRunning && (
+          <span className="slog-status-badge running" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '9px', color: 'var(--purple-text)', fontFamily: 'var(--font-mono)' }}>
+            <span className="live-dot" />
+            running
+          </span>
+        )}
+      </div>
 
       {attempt.command && (
         <>
@@ -285,14 +389,16 @@ function AttemptLog({ attempt, num }) {
         </>
       )}
 
-      <div className="slog-attempt-result">
-        <span className={`slog-exit ${attempt.exitSuccess ? 'ok' : 'fail'}`}>
-          exit {attempt.exitSuccess ? '0 ✓' : 'non-zero ✗'}
-        </span>
-        {attempt.aiMessage && (
-          <span className="slog-ai-msg">{attempt.aiMessage}</span>
-        )}
-      </div>
+      {!isRunning && (
+        <div className="slog-attempt-result">
+          <span className={`slog-exit ${attempt.exitSuccess ? 'ok' : 'fail'}`}>
+            exit {attempt.exitSuccess ? '0 ✓' : 'non-zero ✗'}
+          </span>
+          {attempt.aiMessage && (
+            <span className="slog-ai-msg">{attempt.aiMessage}</span>
+          )}
+        </div>
+      )}
 
       {attempt.fixedCommand && (
         <>
@@ -301,19 +407,81 @@ function AttemptLog({ attempt, num }) {
         </>
       )}
 
-      {attempt.stderr && !attempt.exitSuccess && (
+      {(isRunning || attempt.stdout || attempt.stderr) && (
         <>
-          <div className="slog-field-label">stderr</div>
-          <pre className="slog-stderr">{attempt.stderr.slice(0, 800)}</pre>
+          <div className="slog-field-label">{isRunning ? 'live output' : 'terminal log'}</div>
+          <TerminalOutput stdout={attempt.stdout} stderr={attempt.stderr} isRunning={isRunning} />
         </>
       )}
     </div>
   )
 }
 
-function VideoPane({ label, file, projectDir, processed }) {
+function parseSubtitles(text) {
+  if (!text) return []
+  const cleanText = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const blocks = cleanText.split('\n\n')
+  const items = []
+
+  for (const block of blocks) {
+    const lines = block.trim().split('\n')
+    if (lines.length < 2) continue
+
+    let timeLine = ''
+    let textStartIndex = 1
+
+    if (lines[0].includes('-->')) {
+      timeLine = lines[0]
+      textStartIndex = 1
+    } else if (lines[1] && lines[1].includes('-->')) {
+      timeLine = lines[1]
+      textStartIndex = 2
+    } else {
+      continue
+    }
+
+    const timeMatch = timeLine.split('-->')
+    if (timeMatch.length !== 2) continue
+
+    const startStr = timeMatch[0].trim()
+    const endStr = timeMatch[1].trim()
+
+    const parseTime = (timeStr) => {
+      const parts = timeStr.split(':')
+      if (parts.length < 2) return 0
+      let secs = 0
+      let mins = 0
+      let hrs = 0
+      if (parts.length === 3) {
+        hrs = parseFloat(parts[0])
+        mins = parseFloat(parts[1])
+        secs = parseFloat(parts[2].replace(',', '.'))
+      } else {
+        mins = parseFloat(parts[0])
+        secs = parseFloat(parts[1].replace(',', '.'))
+      }
+      return hrs * 3600 + mins * 60 + secs
+    }
+
+    const startTime = parseTime(startStr)
+    const endTime = parseTime(endStr)
+    const textContent = lines.slice(textStartIndex).join('\n')
+
+    items.push({
+      startStr,
+      endStr,
+      startTime,
+      endTime,
+      text: textContent
+    })
+  }
+  return items
+}
+
+function VideoPane({ label, file, projectDir, processed, seekTime, setSeekTime }) {
   const [textPreview, setTextPreview] = useState(null)
   const [probeInfo, setProbeInfo] = useState(null)
+  const videoRef = React.useRef(null)
   
   const filePath = file ? (typeof file === 'string' ? file : file.path) : ''
   const name = file ? (typeof file === 'string' ? filePath.split(/[\\/]/).pop() : file.name) : ''
@@ -323,6 +491,7 @@ function VideoPane({ label, file, projectDir, processed }) {
   const isAudio = ['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg', 'opus', 'wma'].includes(ext)
   const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'tiff', 'svg'].includes(ext)
   const isText = ['srt', 'vtt', 'ass', 'ssa', 'txt', 'md'].includes(ext)
+  const isSrt = ['srt', 'vtt', 'ass', 'ssa'].includes(ext)
 
   useEffect(() => {
     let cancelled = false
@@ -337,13 +506,20 @@ function VideoPane({ label, file, projectDir, processed }) {
         setTextPreview('Unable to load text preview.')
         return
       }
-      setTextPreview((result.content || '').slice(0, 6000))
+      setTextPreview(result.content || '')
     }).catch(() => {
       if (!cancelled) setTextPreview('Unable to load text preview.')
     })
 
     return () => { cancelled = true }
   }, [filePath, isText, projectDir])
+
+  useEffect(() => {
+    if (seekTime && videoRef.current && isVideo) {
+      videoRef.current.currentTime = seekTime.time
+      videoRef.current.play().catch(() => {})
+    }
+  }, [seekTime, isVideo])
 
   useEffect(() => {
     if (!filePath) {
@@ -414,6 +590,8 @@ function VideoPane({ label, file, projectDir, processed }) {
     )
   }
 
+  const subtitles = isSrt && textPreview ? parseSubtitles(textPreview) : []
+
   return (
     <div className="video-pane">
       <div className="pane-label">
@@ -430,7 +608,7 @@ function VideoPane({ label, file, projectDir, processed }) {
       <div className="pane-screen">
         <div className="media-container">
           {isVideo && (
-            <video key={filePath} src={`atom://${filePath}`} controls className="preview-media" />
+            <video ref={videoRef} key={filePath} src={`atom://${filePath}`} controls className="preview-media" />
           )}
           {isAudio && (
             <div className="audio-preview">
@@ -442,9 +620,41 @@ function VideoPane({ label, file, projectDir, processed }) {
           {isImage && (
             <img key={filePath} src={`atom://${filePath}`} alt={name} className="preview-media" />
           )}
-          {isText && (
-            <div className="text-preview">
-              <pre>{textPreview ?? 'Loading text preview...'}</pre>
+          {isSrt && (
+            <div className="subtitle-viewer">
+              {textPreview === null ? (
+                <div className="empty-subtitles">Loading subtitles...</div>
+              ) : textPreview === 'Unable to load text preview.' ? (
+                <div className="empty-subtitles">Unable to load subtitles.</div>
+              ) : subtitles.length === 0 ? (
+                <div className="empty-subtitles">No subtitles parsed or empty file.</div>
+              ) : (
+                subtitles.map((sub, index) => (
+                  <div
+                    key={index}
+                    className="subtitle-segment"
+                    onClick={() => setSeekTime({ time: sub.startTime, timestamp: Date.now() })}
+                  >
+                    <div className="subtitle-time">
+                      <span>{sub.startStr}</span>
+                      <span className="time-arrow">→</span>
+                      <span>{sub.endStr}</span>
+                    </div>
+                    <div className="subtitle-text">{sub.text}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+          {isText && !isSrt && (
+            <div className="text-viewer">
+              {textPreview === null ? (
+                <div className="empty-subtitles">Loading file...</div>
+              ) : textPreview === 'Unable to load text preview.' ? (
+                <div className="empty-subtitles">Unable to load text file.</div>
+              ) : (
+                <pre className="text-content-pre">{textPreview}</pre>
+              )}
             </div>
           )}
           {!isVideo && !isAudio && !isImage && !isText && (

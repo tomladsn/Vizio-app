@@ -3,7 +3,7 @@ import { settingsStore } from '../../store/settingsStore'
 import { useSecureKeys } from '../../hooks/useSecureKeys'
 import './ExecutionBar.css'
 
-export default function ExecutionBar({ tasks = [], pendingWorkflow = null }) {
+export default function ExecutionBar({ tasks = [], pendingWorkflow = null, height, onResizeStart }) {
   const [config, setConfig] = useState(settingsStore.getActiveConfig())
   const { isProviderReady } = useSecureKeys()
   const pendingSteps = pendingWorkflow?.steps ?? []
@@ -18,7 +18,12 @@ export default function ExecutionBar({ tasks = [], pendingWorkflow = null }) {
   const hasModel = !!config.model?.trim()
 
   return (
-    <div className="exec-bar">
+    <div className="exec-bar" style={height ? { height } : undefined}>
+      <div
+        className="exec-resize-handle"
+        onMouseDown={onResizeStart}
+        title="Drag to resize"
+      />
       <div className="exec-session">
         <div className="exec-label">Session</div>
         <div className="session-row">

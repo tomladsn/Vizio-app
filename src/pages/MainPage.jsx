@@ -1,9 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import MediaLibrary from '../components/library/MediaLibrary'
 import ChatPanel from '../components/chat/ChatPanel'
 import PreviewPanel from '../components/preview/PreviewPanel'
 import ExecutionBar from '../components/layout/ExecutionBar'
 import './MainPage.css'
+
+// Panel size constraints (px)
+const LIBRARY_MIN    = 160
+const LIBRARY_MAX    = 500
+const PREVIEW_MIN    = 220
+const PREVIEW_MAX    = 700
+const CHAT_MIN       = 120
+const EXECBAR_MIN    = 44
+const EXECBAR_MAX    = 260
 
 export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSessionId, activeChatId, onChatChange, onRegisterLibraryReload, toolsBlock }) {
   const [activeFile, setActiveFile] = useState(null)
@@ -12,6 +21,13 @@ export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSe
   const [outputFiles, setOutputFiles]   = useState([])
   const [reloadTrigger, setReloadTrigger] = useState(0)
   const [chats, setChats] = useState([])
+
+  // Resizable panel widths
+  const [libraryWidth,  setLibraryWidth]  = useState(220)
+  const [chatWidth,     setChatWidth]     = useState(320)
+  const [execBarHeight, setExecBarHeight] = useState(110)
+  const bodyRef      = useRef(null)
+  const draggingRef  = useRef(null) // { panel, startX, startY, startLibrary, startChat, startExecBar }
 
   // Holds files selected from MediaLibrary to attach to the next chat message
   const [attachedFiles, setAttachedFiles] = useState([])
@@ -139,28 +155,97 @@ export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSe
     mentionFnRef.current?.(filename)
   }
 
+  // ── Resize logic ────────────────────────────────────────────────────────────
+  const onMouseDown = useCallback((panel) => (e) => {
+    e.preventDefault()
+    draggingRef.current = { panel, startX: e.clientX, startY: e.clientY, startLibrary: libraryWidth, startChat: chatWidth, startExecBar: execBarHeight }
+    document.body.style.cursor = panel === 'execbar' ? 'row-resize' : 'col-resize'
+    document.body.style.userSelect = 'none'
+    document.body.classList.add('dragging-panel')
+  }, [libraryWidth, chatWidth, execBarHeight])
+
+  useEffect(() => {
+    function onMouseMove(e) {
+      if (!draggingRef.current) return
+      const { panel, startX, startY, startLibrary, startChat, startExecBar } = draggingRef.current
+
+      if (panel === 'library') {
+        const delta = e.clientX - startX
+        const newW = Math.min(LIBRARY_MAX, Math.max(LIBRARY_MIN, startLibrary + delta))
+        setLibraryWidth(newW)
+      } else if (panel === 'preview') {
+        const delta = e.clientX - startX
+        const bodyW = bodyRef.current?.clientWidth ?? 1200
+        const newChatW = startChat - delta
+        const maxChat = Math.min(bodyW - libraryWidth - PREVIEW_MIN - 16, bodyW - LIBRARY_MIN - PREVIEW_MIN - 16)
+        const constrainedChatW = Math.min(maxChat, Math.max(CHAT_MIN, newChatW))
+        setChatWidth(constrainedChatW)
+      } else if (panel === 'execbar') {
+        const delta = startY - e.clientY
+        const newH = Math.min(EXECBAR_MAX, Math.max(EXECBAR_MIN, startExecBar + delta))
+        setExecBarHeight(newH)
+      }
+    }
+
+    function onMouseUp() {
+      if (!draggingRef.current) return
+      draggingRef.current = null
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.body.classList.remove('dragging-panel')
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [])
+
   return (
     <div className="main-page">
-      <div className="main-body">
-        <MediaLibrary
-          project={project}
-          activeFile={activeFile}
-          onSelectFile={handleSelectFile}
-          onMentionFile={handleMentionFile}
-          onMentionFiles={handleAttachFiles}
-          onDeleteFile={handleDeleteFile}
-          onFilesChange={handleLibraryFilesChange}
-          reloadTrigger={reloadTrigger}
+      <div className="main-body" ref={bodyRef}>
+        {/* ── Left: Media Library ──────────────────────────────────────────── */}
+        <div style={{ width: libraryWidth, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <MediaLibrary
+            project={project}
+            activeFile={activeFile}
+            onSelectFile={handleSelectFile}
+            onMentionFile={handleMentionFile}
+            onMentionFiles={handleAttachFiles}
+            onDeleteFile={handleDeleteFile}
+            onFilesChange={handleLibraryFilesChange}
+            reloadTrigger={reloadTrigger}
+          />
+        </div>
+
+        {/* ── Resize handle: Library ↔ Preview ─────────────────────────────── */}
+        <div
+          className="resize-handle"
+          onMouseDown={onMouseDown('library')}
+          title="Drag to resize"
         />
 
-        <PreviewPanel
-          project={project}
-          activeFile={activeFile}
-          sessionId={sessionId}
-          onMentionFile={handleMentionFile}
+        {/* ── Middle: Preview Panel ─────────────────────────────────────────── */}
+        <div style={{ flex: 1, minWidth: PREVIEW_MIN, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <PreviewPanel
+            project={project}
+            activeFile={activeFile}
+            sessionId={sessionId}
+            onMentionFile={handleMentionFile}
+          />
+        </div>
+
+        {/* ── Resize handle: Preview ↔ Chat ────────────────────────────────── */}
+        <div
+          className="resize-handle"
+          onMouseDown={onMouseDown('preview')}
+          title="Drag to resize"
         />
 
-        <div className="center-panel" style={{ position: 'relative' }}>
+        {/* ── Right: Chat Panel ─────────────────────────────────────────────── */}
+        <div className="center-panel" style={{ width: chatWidth, flexShrink: 0, position: 'relative' }}>
           <div className="chat-topbar">
             <button
               className="chat-history-btn"
@@ -247,7 +332,7 @@ export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSe
         </div>
       </div>
 
-      <ExecutionBar tasks={tasks} pendingWorkflow={pendingWorkflow} />
+      <ExecutionBar tasks={tasks} pendingWorkflow={pendingWorkflow} height={execBarHeight} onResizeStart={onMouseDown('execbar')} />
     </div>
   )
 }

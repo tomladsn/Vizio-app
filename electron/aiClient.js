@@ -3,6 +3,16 @@
  * API keys are never sent to the renderer.
  */
 
+function getProviderBaseUrl(providerId) {
+  const baseUrls = {
+    openai: 'https://api.openai.com/v1',
+    google: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    deepseek: 'https://api.deepseek.com',
+    openrouter: 'https://openrouter.ai/api/v1',
+  }
+  return baseUrls[providerId] || null
+}
+
 function buildHeaders(providerId, apiKey) {
   if (providerId === 'anthropic') {
     return {
@@ -147,9 +157,14 @@ async function readAnthropicStream(res, onDelta, signal) {
 }
 
 export async function callAI(messages, config, { retries = 3, signal } = {}) {
-  const { baseUrl, apiKey, model, providerId } = config
+  let { baseUrl, apiKey, model, providerId } = config
   const maxTokens = Number(config.maxTokens) > 0 ? Number(config.maxTokens) : 2048
   const temperature = Number.isFinite(Number(config.temperature)) ? Number(config.temperature) : 0.2
+
+  // Determine baseUrl if not provided
+  if (!baseUrl && providerId !== 'anthropic') {
+    baseUrl = getProviderBaseUrl(providerId)
+  }
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     if (signal?.aborted) {
@@ -221,9 +236,14 @@ export async function callAI(messages, config, { retries = 3, signal } = {}) {
 }
 
 export async function streamAI(messages, config, { onDelta, signal } = {}) {
-  const { baseUrl, apiKey, model, providerId } = config
+  let { baseUrl, apiKey, model, providerId } = config
   const maxTokens = Number(config.maxTokens) > 0 ? Number(config.maxTokens) : 2048
   const temperature = Number.isFinite(Number(config.temperature)) ? Number(config.temperature) : 0.2
+
+  // Determine baseUrl if not provided
+  if (!baseUrl && providerId !== 'anthropic') {
+    baseUrl = getProviderBaseUrl(providerId)
+  }
 
   const payloadMessages = providerId === 'anthropic'
     ? messages

@@ -155,12 +155,53 @@
   --text-hint:      #768696;
 }
 
+/* Additional theme styles */
+[data-theme="midnight"] {
+  --bg-base:        #071026;
+  --bg-surface:     #0b2030;
+  --bg-raised:      #0f2a3e;
+  --bg-overlay:     #11283a;
+  --text-primary:   #E6F5FF;
+  --text-secondary: #CFE9FF;
+  --text-muted:     #9fbfd6;
+  --app-backdrop:
+    linear-gradient(135deg, rgba(var(--accent-rgb),0.08), transparent 30%),
+    var(--bg-base);
+}
+
+[data-theme="solar"] {
+  --bg-base:        #2b1b10;
+  --bg-surface:     #3a2412;
+  --bg-raised:      #432a18;
+  --bg-overlay:     #51321f;
+  --text-primary:   #FFF7EE;
+  --text-secondary: #FFEBD6;
+  --text-muted:     #E0C5AD;
+  --app-backdrop:
+    linear-gradient(135deg, rgba(var(--accent-rgb),0.06), transparent 30%),
+    var(--bg-base);
+}
+
+[data-theme="dracula"] {
+  --bg-base:        #0f0f18;
+  --bg-surface:     #13121b;
+  --bg-raised:      #171422;
+  --bg-overlay:     #1e1930;
+  --text-primary:   #E6E9F6;
+  --text-secondary: #CDCFF7;
+  --text-muted:     #9CA0C8;
+  --app-backdrop:
+    linear-gradient(135deg, rgba(var(--accent-rgb),0.06), transparent 30%),
+    var(--bg-base);
+}
+
 [data-accent="vizio"] {
-  --accent:         #5d2441;
-  --accent-rgb:     93,36,65;
+  /* Vizio brand set to blue/cyan tones */
+  --accent:         #2a70b8;
+  --accent-rgb:     42,112,184;
   --accent-dim:     rgba(var(--accent-rgb),0.15);
   --accent-border:  rgba(var(--accent-rgb),0.28);
-  --accent-text:    #D88AB2;
+  --accent-text:    #9edcff;
 }
 
 [data-accent="green"] {
@@ -185,6 +226,30 @@
   --accent-dim:     rgba(var(--accent-rgb),0.15);
   --accent-border:  rgba(var(--accent-rgb),0.28);
   --accent-text:    #9EDCFF;
+}
+
+[data-accent="cyan"] {
+  --accent:         #18d8f0;
+  --accent-rgb:     24,216,240;
+  --accent-dim:     rgba(var(--accent-rgb),0.15);
+  --accent-border:  rgba(var(--accent-rgb),0.28);
+  --accent-text:    #c8f7fb;
+}
+
+[data-accent="teal"] {
+  --accent:         #1a8898;
+  --accent-rgb:     26,136,152;
+  --accent-dim:     rgba(var(--accent-rgb),0.15);
+  --accent-border:  rgba(var(--accent-rgb),0.28);
+  --accent-text:    #a7e6e8;
+}
+
+[data-accent="indigo"] {
+  --accent:         #4a50d8;
+  --accent-rgb:     74,80,216;
+  --accent-dim:     rgba(var(--accent-rgb),0.15);
+  --accent-border:  rgba(var(--accent-rgb),0.28);
+  --accent-text:    #cfcfff;
 }
 
 [data-accent="coral"] {

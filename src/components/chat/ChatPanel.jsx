@@ -729,6 +729,9 @@ export default function ChatPanel({
   onClearAttachments,
   onMentionFiles,
   onPendingWorkflow,
+  onStepStart,
+  onStepOutput,
+  onStepCmdUpdate,
 }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -1016,12 +1019,34 @@ export default function ChatPanel({
       }
     })
 
+    // Live command execution events for session panel
+    const u4 = window.electron.onStepStart?.(({ stepId, cmd }) => {
+      onStepStart?.({ stepId, cmd })
+    })
+
+    const u5 = window.electron.onStepOutput?.(({ stepId, stream, text }) => {
+      onStepOutput?.({ stepId, stream, text })
+    })
+
+    const u6 = window.electron.onStepCmdUpdate?.(({ stepId, cmd, message: msg }) => {
+      onStepCmdUpdate?.({ stepId, cmd, message: msg })
+      // Also update the task's step command
+      onTaskUpdate?.(prev => prev.map(task => {
+        if (!task.steps?.find(step => step.id === stepId)) return task
+        const steps = task.steps.map(step => step.id === stepId ? { ...step, cmd } : step)
+        return { ...task, steps }
+      }))
+    })
+
     return () => {
       u1?.()
       u2?.()
       u3?.()
+      u4?.()
+      u5?.()
+      u6?.()
     }
-  }, [onTaskUpdate])
+  }, [onTaskUpdate, onStepStart, onStepOutput, onStepCmdUpdate])
 
   function handleApprove() {
     const workflow = pendingWorkflowRef.current
@@ -1572,15 +1597,7 @@ function Message({ msg, canEdit, onEdit, onRedo }) {
   }
 
   if (msg.type === 'streaming') {
-    return (
-      <div className="msg ai">
-        <div className="bubble streaming">
-          {msg.content ? <MessageContent content={msg.content} /> : (
-            <div className="typing-dots"><span /><span /><span /></div>
-          )}
-        </div>
-      </div>
-    )
+    return <StreamingBubble msg={msg} />
   }
 
   return (
@@ -1632,5 +1649,66 @@ function StopIcon() {
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
       <rect x="4" y="4" width="6" height="6" rx="1.2" fill="white" />
     </svg>
+  )
+}
+
+function StreamingBubble({ msg }) {
+  const [showRaw, setShowRaw] = useState(false)
+  const content = msg.content || ''
+  
+  let status = 'Thinking...'
+  if (content.length > 0) {
+    if (content.includes('"steps"')) {
+      status = 'Structuring workflow steps...'
+    } else if (content.includes('"mode"')) {
+      status = 'Analyzing request mode...'
+    } else {
+      status = 'Formulating media plan...'
+    }
+  }
+
+  return (
+    <div className="msg ai streaming-container">
+      <div className="bubble streaming-bubble">
+        <div className="streaming-header">
+          <div className="streaming-ai-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+            </svg>
+          </div>
+          <span className="streaming-status">{status}</span>
+          <div className="streaming-spinner-mini" />
+        </div>
+
+        <div className="streaming-toggle-row">
+          <button 
+            type="button" 
+            className="streaming-toggle-btn"
+            onClick={() => setShowRaw(!showRaw)}
+          >
+            {showRaw ? 'Hide Raw Plan' : 'Show Raw Plan'}
+          </button>
+        </div>
+
+        {showRaw && content && (
+          <div className="streaming-raw-panel">
+            <div className="streaming-raw-header">
+              <span>RAW PLAN STREAM</span>
+              <button 
+                type="button" 
+                className="streaming-copy-btn"
+                onClick={() => {
+                  navigator.clipboard.writeText(content)
+                  alert('Copied to clipboard!')
+                }}
+              >
+                Copy
+              </button>
+            </div>
+            <pre className="streaming-raw-text">{content}</pre>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

@@ -471,6 +471,11 @@
 .theme-preview.frost  { background: linear-gradient(135deg, #edf6fb, #d9ecfb); }
 .theme-preview.pearl  { background: linear-gradient(135deg, #f4f1ed, #e9edf2); }
 .theme-preview.day    { background: linear-gradient(135deg, #ffffff, #eef3f8); }
+/* New theme previews */
+.theme-preview.midnight { background: linear-gradient(135deg, #071026, #15324b); }
+.theme-preview.solar    { background: linear-gradient(135deg, #322617, #ffd89b); }
+.theme-preview.dracula  { background: linear-gradient(135deg, #282a36, #44475a); }
+.theme-preview.sepia    { /* removed - theme not available */ }
 
 .tp-bar {
   height: 10px;
@@ -575,6 +580,13 @@
   font-size: 11px;
   font-weight: 500;
   color: var(--text-primary);
+}
+
+.optional-badge {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: normal;
+  margin-left: 6px;
 }
 
 .font-grid {

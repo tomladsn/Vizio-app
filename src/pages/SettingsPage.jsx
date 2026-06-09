@@ -130,7 +130,7 @@ function ProviderConfig({ provider, settings, onUpdate }) {
   const keyId = pid + 'ApiKey'
 
   useEffect(() => {
-    if (!provider.requiresKey) return
+    if (!provider.requiresKey && pid !== 'ollama') return
     window.electron.keys.getHint(keyId).then(res => {
       setKeyExists(res.exists)
       setKeyHint(res.hint)
@@ -171,23 +171,29 @@ function ProviderConfig({ provider, settings, onUpdate }) {
 
   return (
     <>
-      {/* API key — not for Ollama */}
-      {provider.requiresKey && (
+      {/* API key — requiresKey OR Ollama */}
+      {(provider.requiresKey || pid === 'ollama') && (
         <section className="settings-section">
           <div className="section-title">
-            {provider.label} API key
+            {provider.label} API key {pid === 'ollama' && <span className="optional-badge">(Optional)</span>}
           </div>
           <p className="section-desc">
-            Get your key at{' '}
-            <a href={`https://${provider.docsUrl}`} target="_blank" rel="noreferrer">
-              {provider.docsUrl}
-            </a>
+            {pid === 'ollama' ? (
+              <span>Required only if using Ollama Cloud. Leave blank for local Ollama.</span>
+            ) : (
+              <>
+                Get your key at{' '}
+                <a href={`https://${provider.docsUrl}`} target="_blank" rel="noreferrer">
+                  {provider.docsUrl}
+                </a>
+              </>
+            )}
           </p>
 
           <div className="key-row">
             <div className="key-meta">
               <div className="key-label">API key</div>
-              <div className="key-env">{provider.envKey}</div>
+              <div className="key-env">{pid === 'ollama' ? 'OLLAMA_API_KEY' : provider.envKey}</div>
             </div>
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -220,7 +226,7 @@ function ProviderConfig({ provider, settings, onUpdate }) {
                   <input
                     type={showDraft ? 'text' : 'password'}
                     className="key-input"
-                    placeholder={keyExists ? 'Enter new key to replace…' : provider.keyPlaceholder}
+                    placeholder={keyExists ? 'Enter new key to replace…' : (pid === 'ollama' ? 'optional API key (for Ollama Cloud)...' : provider.keyPlaceholder)}
                     value={keyDraft}
                     onChange={e => setKeyDraft(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleSaveKey() }}
@@ -251,7 +257,11 @@ function ProviderConfig({ provider, settings, onUpdate }) {
               )}
 
               {!keyExists && !keyDraft && (
-                <div className="key-status empty"><span>not set — key will be encrypted on save</span></div>
+                <div className="key-status empty">
+                  <span>
+                    {pid === 'ollama' ? 'optional — leave blank for local Ollama' : 'not set — key will be encrypted on save'}
+                  </span>
+                </div>
               )}
             </div>
           </div>

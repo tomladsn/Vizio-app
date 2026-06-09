@@ -66,6 +66,16 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.on('agent:stepUpdate', fn)
     return () => ipcRenderer.removeListener('agent:stepUpdate', fn)
   },
+  onStepStart: (cb) => {
+    const fn = (_, data) => cb(data)
+    ipcRenderer.on('agent:stepStart', fn)
+    return () => ipcRenderer.removeListener('agent:stepStart', fn)
+  },
+  onStepOutput: (cb) => {
+    const fn = (_, data) => cb(data)
+    ipcRenderer.on('agent:stepOutput', fn)
+    return () => ipcRenderer.removeListener('agent:stepOutput', fn)
+  },
   onStepCmdUpdate: (cb) => {
     const fn = (_, data) => cb(data)
     ipcRenderer.on('agent:stepCmdUpdate', fn)
@@ -90,6 +100,8 @@ contextBridge.exposeInMainWorld('electron', {
   // Remove all agent listeners (call on component unmount)
   removeAgentListeners: () => {
     ipcRenderer.removeAllListeners('agent:stepUpdate')
+    ipcRenderer.removeAllListeners('agent:stepStart')
+    ipcRenderer.removeAllListeners('agent:stepOutput')
     ipcRenderer.removeAllListeners('agent:stepCmdUpdate')
     ipcRenderer.removeAllListeners('agent:stepDone')
     ipcRenderer.removeAllListeners('agent:done')

@@ -10,6 +10,7 @@
 .messages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 16px 14px 8px;
   display: flex;
   flex-direction: column;
@@ -89,6 +90,9 @@
   padding: 9px 14px;
   font-size: 13px;
   line-height: 1.5;
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .msg.ai .bubble {
@@ -320,6 +324,8 @@
   background: rgba(255,255,255,0.08);
   padding: 1px 5px;
   border-radius: 4px;
+  word-break: break-all;
+  white-space: pre-wrap;
 }
 
 /* ── Workflow approval card ── */
@@ -677,4 +683,121 @@
 .attach-image-icon:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Streaming bubble styling */
+.streaming-container {
+  max-width: 90%;
+  margin: 4px 0;
+}
+
+.streaming-bubble {
+  background: rgba(var(--accent-rgb), 0.04) !important;
+  border: 1.5px solid rgba(var(--accent-rgb), 0.15) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  border-radius: 18px 18px 18px 4px !important;
+  padding: 12px 16px !important;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.streaming-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+}
+
+.streaming-ai-icon {
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: spin 3s linear infinite;
+}
+
+.streaming-status {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.streaming-spinner-mini {
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid rgba(var(--accent-rgb), 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-left: auto;
+}
+
+.streaming-toggle-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.streaming-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color 0.15s;
+}
+
+.streaming-toggle-btn:hover {
+  color: var(--text-secondary);
+  text-decoration: underline;
+}
+
+.streaming-raw-panel {
+  background: #090d13;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.streaming-raw-header {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 0.5px solid var(--border);
+  padding: 6px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.streaming-copy-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.streaming-copy-btn:hover {
+  color: var(--text-secondary);
+}
+
+.streaming-raw-text {
+  margin: 0;
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: #8b949e;
+  max-height: 180px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.4;
 }

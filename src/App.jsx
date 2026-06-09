@@ -3,6 +3,7 @@ import ProjectGate  from './components/project/ProjectGate'
 import MainPage    from './pages/MainPage'
 import ToolsPage   from './pages/ToolsPage'
 import SettingsPage from './pages/SettingsPage'
+import NodePage     from './pages/NodePage'
 import MenuBar      from './components/layout/MenuBar'
 import { settingsStore, collectLegacyApiKeys } from './store/settingsStore'
 import './styles/globals.css'
@@ -148,8 +149,12 @@ export default function App() {
         canGoForward={histIdx < history.length - 1}
         onBack={goBack}
         onForward={goForward}
-        projectName={project.name}
-        onChangeProject={() => setProject(null)}
+        onChangeProject={() => {
+          setProject(null)
+          setTasks([])
+          setSessionId(null)
+          setActiveChatId(null)
+        }}
       />
 
       {/* Global drag-and-drop overlay */}
@@ -204,6 +209,9 @@ export default function App() {
         </div>
         <div style={{ display: page === 'settings' ? 'contents' : 'none' }}>
           <SettingsPage />
+        </div>
+        <div style={{ display: page === 'node' ? 'contents' : 'none' }}>
+          <NodePage />
         </div>
       </div>
     </div>

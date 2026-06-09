@@ -1,13 +1,30 @@
 .exec-bar {
-  min-height: 110px;
-  height: auto;
-  max-height: 180px;
+  min-height: 44px;
+  height: 110px; /* default; overridden by inline style when dragged */
+  max-height: none;
   flex-shrink: 0;
   background: var(--bg-surface);
   border-top: 0.5px solid var(--border);
   display: grid;
   grid-template-columns: 220px 1fr;
   overflow: hidden;
+  position: relative;
+}
+
+.exec-resize-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  cursor: row-resize;
+  z-index: 10;
+  transition: background 0.15s;
+}
+
+.exec-resize-handle:hover {
+  background: var(--blue, #3b82f6);
+  opacity: 0.5;
 }
 
 .exec-session {

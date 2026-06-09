@@ -52,7 +52,7 @@ ipcMain.handle('keys:migrate', (_, legacyKeys) => {
 const aiStreamControllers = new Map()
 
 function resolveAIConfig({ providerId, baseUrl, model, maxTokens, temperature }) {
-  const apiKey = providerId === 'ollama' ? '' : getDecryptedKey(`${providerId}ApiKey`)
+  const apiKey = getDecryptedKey(`${providerId}ApiKey`)
   return buildAIConfig({ providerId, baseUrl, model, maxTokens, temperature, apiKey })
 }
 
@@ -560,10 +560,21 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
         return
       }
 
+      // Notify renderer which command is about to run
+      event.sender.send('agent:stepStart', { stepId: step.id, cmd: currentCommand })
+
+      // Start attempt in session log file
+      log.startAttempt?.(step.id, currentCommand)
+
       const result = await runFfmpeg(currentCommand, {
         signal: controller.signal,
         onProgress: (pct) => {
           event.sender.send('agent:stepUpdate', { stepId: step.id, status: 'running', pct })
+        },
+        onOutput: ({ stream, text }) => {
+          event.sender.send('agent:stepOutput', { stepId: step.id, stream, text })
+          // Stream output to the session log file
+          log.updateAttemptOutput?.(step.id, stream, text)
         },
       })
 

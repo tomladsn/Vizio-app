@@ -1,9 +1,10 @@
-/* ── Panel shell ─────────────────────────────────────────────────────────────── */
+/* ── Panel shell ──────────────────────────────────────────────────────────── */
 .library {
-  width: 220px;
-  flex-shrink: 0;
+  width: 100%;
+  height: 100%;
+  flex: 1;
   background: var(--bg-surface);
-  border-right: 0.5px solid var(--border);
+  border-right: none; /* border handled by resize handle */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -456,6 +457,9 @@
   padding: 8px;
   border-top: 0.5px solid var(--border);
   animation: fadeIn 0.12s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .select-send-btn {
@@ -483,6 +487,36 @@
 }
 
 .select-send-btn:active {
+  transform: translateY(0);
+}
+
+.select-delete-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 0.5px solid rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.02em;
+}
+
+.select-delete-btn:hover {
+  background: #ef4444;
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+}
+
+.select-delete-btn:active {
   transform: translateY(0);
 }
 

@@ -6,6 +6,7 @@ export default function MenuBar({ activePage, onNavigate, canGoBack, canGoForwar
   const items = [
     { label: 'Workspace', value: 'main' },
     { label: 'Tools', value: 'tools' },
+    { label: 'Node', value: 'node' },
     { label: 'Settings', value: 'settings' },
   ]
 

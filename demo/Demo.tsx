@@ -8,6 +8,7 @@ import {
   SceneSettings, SceneOutro,
 } from './Scenes'
 
+
 function FadeOut({ children, dur, fadeFrames = 12 }:{children:React.ReactNode;dur:number;fadeFrames?:number}) {
   const f = useCurrentFrame()
   const opacity = interpolate(f,[dur-fadeFrames,dur],[1,0],{extrapolateLeft:'clamp',extrapolateRight:'clamp'})

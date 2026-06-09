@@ -125,6 +125,38 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
     setSelectMode(false)
   }
 
+  async function handleDeleteSelected() {
+    if (selected.size === 0) return
+    const msg = `Are you sure you want to delete ${selected.size} selected file${selected.size === 1 ? '' : 's'}?`
+    if (!confirm(msg)) return
+
+    setDeleteError(null)
+    const paths = Array.from(selected)
+    let failedCount = 0
+    let lastError = null
+
+    for (const filePath of paths) {
+      const result = await window.electron.project.deleteMedia(filePath, project.folderPath)
+      if (!result?.ok) {
+        failedCount++
+        lastError = result?.message || 'Unknown error'
+      } else {
+        const file = files.find(f => f.path === filePath)
+        if (file && activeFile?.path === file.path) {
+          onDeleteFile?.(file)
+        }
+      }
+    }
+
+    if (failedCount > 0) {
+      setDeleteError(`Failed to delete ${failedCount} file(s). Error: ${lastError}`)
+    }
+
+    setSelected(new Set())
+    setSelectMode(false)
+    await loadMedia()
+  }
+
   return (
     <div
       ref={dropRef}
@@ -225,6 +257,9 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
               <path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             Send {selected.size} to chat
+          </button>
+          <button className="select-delete-btn" onClick={handleDeleteSelected}>
+            Delete {selected.size}
           </button>
         </div>
       )}
