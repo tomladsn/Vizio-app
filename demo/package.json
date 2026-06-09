@@ -7,7 +7,7 @@
   "render:gif": "npx remotion render index.ts VizioDemo out/demo.gif --codec=gif --scale=0.5"
 },
   "dependencies": {
-    "@remotion/cli": "4.0.0",
+    "@remotion/cli": "4.0.474",
     "remotion":      "4.0.0",
     "react":         "^18.0.0",
     "react-dom":     "^18.0.0"
