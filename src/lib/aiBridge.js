@@ -24,7 +24,7 @@ export async function completeChat(messages, { retries = 2 } = {}) {
   return res.text ?? ''
 }
 
-export function streamChat(messages, { onDelta, signal } = {}) {
+export function streamChat(messages, { onDelta, onStatus, signal } = {}) {
   const requestId = crypto.randomUUID()
   const channel = `ai:stream:${requestId}`
   const cfg = settingsStore.getActiveConfig()
@@ -38,6 +38,7 @@ export function streamChat(messages, { onDelta, signal } = {}) {
     }
 
     unsub = window.electron.ai.onStream(channel, (payload) => {
+      if (payload.status) onStatus?.(payload.status)
       if (payload.delta) onDelta?.(payload.delta)
       if (payload.done) {
         cleanup()

@@ -74,16 +74,35 @@ ipcMain.handle('ai:streamStart', async (event, payload) => {
 
   const config = resolveAIConfig(payload)
 
+  let throttleTimer = null
+  let buffer = ''
+  
+  const flush = () => {
+    if (buffer.length > 0 && !event.sender.isDestroyed()) {
+      event.sender.send(channel, { delta: buffer })
+      buffer = ''
+    }
+    throttleTimer = null
+  }
+
   streamAI(messages, config, {
     signal: controller.signal,
+    onStatus: (status) => {
+      if (!event.sender.isDestroyed()) event.sender.send(channel, { status })
+    },
     onDelta: (delta) => {
-      if (!event.sender.isDestroyed()) event.sender.send(channel, { delta })
+      buffer += delta
+      if (!throttleTimer) {
+        throttleTimer = setTimeout(flush, 50)
+      }
     },
   })
     .then((fullText) => {
+      if (throttleTimer) { clearTimeout(throttleTimer); flush() }
       if (!event.sender.isDestroyed()) event.sender.send(channel, { done: true, fullText })
     })
     .catch((err) => {
+      if (throttleTimer) { clearTimeout(throttleTimer); flush() }
       if (!event.sender.isDestroyed()) {
         event.sender.send(channel, {
           error: err.message || 'Stream failed',

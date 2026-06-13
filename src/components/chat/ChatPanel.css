@@ -801,3 +801,41 @@
   word-break: break-all;
   line-height: 1.4;
 }
+
+/* ── Pipeline Preview Card ──────────────────────────────────────────────── */
+.pipeline-preview-card {
+  align-self: flex-start;
+  background: var(--card, #0D1525);
+  border: 0.5px solid rgba(139,53,204,0.35);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 4px 0;
+  max-width: 92%;
+  animation: card-in 0.2s ease both;
+}
+.pp-header { display:flex; align-items:center; gap:7px; margin-bottom:5px; }
+.pp-icon   { font-size:14px; color:#8B35CC; }
+.pp-name   { font-size:12px; font-weight:500; color:rgba(200,216,232,0.9); flex:1; }
+.pp-count  { font-size:10px; color:rgba(200,216,232,0.35); background:rgba(255,255,255,0.05);
+             border-radius:4px; padding:1px 6px; }
+.pp-desc   { font-size:11px; color:rgba(200,216,232,0.4); margin-bottom:10px; line-height:1.5; }
+.pp-steps  { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+.pp-step   { display:flex; align-items:center; justify-content:space-between; gap:8px;
+             padding:5px 8px; background:rgba(255,255,255,0.02); border-radius:6px; }
+.pp-step-left { display:flex; align-items:center; gap:7px; flex:1; min-width:0; }
+.pp-step-dot  { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.pp-step-title{ font-size:11px; color:rgba(200,216,232,0.75); flex:1;
+                white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pp-step-type { font-size:9px; letter-spacing:0.03em; flex-shrink:0; }
+.pp-add-btn   { background:rgba(139,53,204,0.12); border:0.5px solid rgba(139,53,204,0.3);
+                border-radius:5px; color:#8B35CC; font-size:10px;
+                padding:3px 9px; cursor:pointer; white-space:nowrap; flex-shrink:0;
+                transition:background 0.1s; }
+.pp-add-btn:hover  { background:rgba(139,53,204,0.22); }
+.pp-add-btn.added  { background:rgba(29,158,117,0.1); border-color:rgba(29,158,117,0.3);
+                     color:#1D9E75; cursor:default; }
+.pp-add-all-btn { width:100%; background:linear-gradient(90deg,rgba(139,53,204,0.15),rgba(27,159,212,0.15));
+                  border:0.5px solid rgba(139,53,204,0.25); border-radius:6px;
+                  color:rgba(200,216,232,0.7); font-size:11px; padding:6px;
+                  cursor:pointer; transition:background 0.12s; }
+.pp-add-all-btn:hover { background:linear-gradient(90deg,rgba(139,53,204,0.25),rgba(27,159,212,0.25)); }

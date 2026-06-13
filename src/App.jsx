@@ -149,6 +149,7 @@ export default function App() {
         canGoForward={histIdx < history.length - 1}
         onBack={goBack}
         onForward={goForward}
+        projectName={project?.name}
         onChangeProject={() => {
           setProject(null)
           setTasks([])
@@ -210,8 +211,15 @@ export default function App() {
         <div style={{ display: page === 'settings' ? 'contents' : 'none' }}>
           <SettingsPage />
         </div>
-        <div style={{ display: page === 'node' ? 'contents' : 'none' }}>
-          <NodePage />
+        <div style={{ display: page === 'node' ? 'flex' : 'none', flex: 1, minHeight: 0 }}>
+          <NodePage
+            project={project}
+            toolsBlock={toolsBlock}
+            activeChatId={activeChatId}
+            onChatSaved={() => {}}
+            onSessionId={setSessionId}
+            onTaskUpdate={setTasks}
+          />
         </div>
       </div>
     </div>

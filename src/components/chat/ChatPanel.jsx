@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { settingsStore } from '../../store/settingsStore'
 import { useSecureKeys } from '../../hooks/useSecureKeys'
 import { streamChat, completeChat } from '../../lib/aiBridge'
+import { buildWorkspacePrompt, buildNodePrompt } from '../../store/systemPrompts'
 import './ChatPanel.css'
 
 export const TASK_PRESETS = [
@@ -14,7 +15,6 @@ export const TASK_PRESETS = [
 ]
 
 const CHAT_MAX_TOKENS = 4000
-const CHAT_HISTORY_LIMIT = 10
 const MAX_CHAT_TITLE_LENGTH = 44
 const MAX_CONTEXT_FILES = 12
 const MAX_PROJECT_STATE_FILES = 20
@@ -61,131 +61,6 @@ function buildProjectStateBlock(projectFiles = [], outputFiles = [], projectDir 
   }
 
   return lines.join('\n')
-}
-
-function buildSystemPrompt(toolsBlock, fileBlock, projectStateBlock, outputDir, memoryBlock = '', workflowBlock = '') {
-  return `You are Vizio, a desktop media processing AGENT with direct control over the project folder.
-You are not a chatbot -- you are an autonomous agent that can read, write, rename, move and delete files inside the project.
-
-${toolsBlock}
-
-${fileBlock}
-
-${projectStateBlock}
-
-${memoryBlock}
-
-${workflowBlock}
-
-## PLANNING CHECKLIST (follow before every workflow)
-1. Identify every input file from PROJECT STATE, attached files, and @mentions -- use exact absolute paths.
-2. Decide output path(s) under: ${outputDir}
-3. Pick the simplest ffmpeg command that meets the goal (avoid re-encoding video if stream copy works).
-4. For 4+ files with the SAME operation, use batch_shell (see below). Otherwise use individual shell steps.
-5. If quality/format/duration is ambiguous, use clarify mode -- do not guess critical settings.
-6. Never use bash loops, && chains, or mkdir for the output folder.
-
-## COMPACT BATCH FORMAT
-For 4 or more files with the identical operation, use batch_shell (preferred over repeating steps):
-{
-  "id": 1,
-  "type": "batch_shell",
-  "title": "Process selected files",
-  "description": "Apply the same operation to every selected file",
-  "input_paths": ["C:/absolute/input1.mp4", "C:/absolute/input2.mp4"],
-  "output_template": "${outputDir}/{base}_fixed.{ext}",
-  "command_template": "ffmpeg -y -i \\"{input}\\" -c copy \\"{output}\\""
-}
-Placeholders: {input}, {output}, {name}, {base}, {ext}. The app expands this into one shell step per file.
-
-## COMMON FFMPEG PATTERNS (Windows paths, always -y)
-- Trim: ffmpeg -y -i "IN" -t 30 -c copy "OUT"
-- Scale 720p: ffmpeg -y -i "IN" -vf scale=1280:720 -c:v libx264 -crf 23 "OUT"
-- Extract audio: ffmpeg -y -i "IN" -vn -c:a libmp3lame -q:a 2 "OUT.mp3"
-- Mute: ffmpeg -y -i "IN" -an -c:v copy "OUT"
-- Image to WebP: ffmpeg -y -i "IN" "OUT.webp"
-- Re-encode smaller: ffmpeg -y -i "IN" -c:v libx264 -crf 28 -c:a aac -b:a 128k "OUT"
-- No "reverb" filter -- use aecho=0.8:0.88:60:0.4 for echo effects
-
-## OUTPUT DIRECTORY
-${outputDir}
-All output files must be saved here unless the user specifies otherwise. Use full absolute Windows paths.
-
-## AGENT STEP TYPES
-- "shell" -- ffmpeg, ffprobe, yt-dlp, whisper, etc.
-- "rename" -- fields: from, to (absolute paths)
-- "delete" -- field: path
-- "move"   -- fields: from, to
-- "write"  -- fields: path, content (text files)
-
-## TEXT FILE ANALYSIS
-When the user asks to analyze an attached or @mentioned .srt/.vtt/.txt/.md file and export a report:
-- The file contents are already provided above under "Text File Contents" when available.
-- Do not say "I will read", "Let me read", "I need to inspect", or ask to read the file later.
-- Return a workflow with a single "write" step that writes the finished report to a .txt file in the output directory.
-- Include the full report text in the "content" field. Use timestamps exactly as they appear in the source file.
-- If the relevant file contents are not present, return clarify mode and ask the user to attach or mention the file.
-
-## PLATFORM
-Windows 10/11. PowerShell/cmd only. No bash syntax.
-
-## RULES
-1. Respond ONLY with a JSON object -- no markdown fences, no text outside JSON.
-2. Always use -y in ffmpeg commands; use full absolute paths.
-3. If a tool is missing, use chat mode and tell the user what to install in Tools.
-4. Never show raw shell commands in "message" fields -- user-facing text only.
-5. Workflows require user confirmation before running.
-6. @mentions are syntax only -- never put @ in real paths.
-7. Process ALL files the user mentioned or attached.
-8. Use conversation memory for follow-ups (e.g. "make it smaller" refers to the last output).
-9. Never narrate tool use. The UI cannot execute prose like "Let me read the file"; it can only execute the JSON modes below.
-
-## RESPONSE MODES
-
-### MODE 1 - workflow proposal
-{
-  "mode": "workflow",
-  "message": "Short summary of the plan",
-  "steps": [
-    {
-      "id": 1,
-      "type": "shell",
-      "title": "Step title",
-      "description": "What this step does",
-      "command": "ffmpeg -y ...",
-      "durationSec": null
-    },
-    {
-      "id": 2,
-      "type": "write",
-      "title": "Write analysis report",
-      "description": "Save the finished recommendations as a text file",
-      "path": "${outputDir}/analysis_report.txt",
-      "content": "Report text here"
-    },
-    {
-      "id": 3,
-      "type": "rename",
-      "title": "Rename output to final name",
-      "description": "Rename the output file",
-      "from": "${outputDir}/tmp_output.mp4",
-      "to": "${outputDir}/final_output.mp4"
-    }
-  ],
-  "final_output": "${outputDir}/final_output.mp4"
-}
-
-### MODE 2 - chat / answer / missing dependency
-{
-  "mode": "chat",
-  "message": "Your reply to the user"
-}
-
-### MODE 3 - clarify before planning
-{
-  "mode": "clarify",
-  "message": "Ask the smallest set of questions needed to remove ambiguity"
-}`
 }
 
 function extractFirstJsonValue(text) {
@@ -324,6 +199,7 @@ function normalizeAIResponse(parsed) {
     if (parsed.type === 'workflow') parsed.mode = 'workflow'
     if (parsed.type === 'chat' || parsed.type === 'text') parsed.mode = 'chat'
     if (parsed.type === 'clarify') parsed.mode = 'clarify'
+    if (parsed.type === 'pipeline') parsed.mode = 'pipeline'
   }
 
   if (parsed.mode === 'chat' && typeof parsed.message !== 'string' && typeof parsed.text === 'string') {
@@ -349,6 +225,12 @@ function normalizeAIResponse(parsed) {
       description: step.description || step.title || `Step ${index + 1}`,
       ...step,
     }))
+  }
+
+  if (parsed.mode === 'pipeline') {
+    if (!Array.isArray(parsed.steps)) return null
+    parsed.name = parsed.name || 'Untitled Pipeline'
+    parsed.description = parsed.description || ''
   }
 
   if ((parsed.mode === 'chat' || parsed.mode === 'clarify') && typeof parsed.message !== 'string') {
@@ -481,7 +363,7 @@ function buildRequestMessages(systemPrompt, history) {
     if (message.role !== 'assistant') return false
     return !!normalizeAIResponse(parseAIResponse(message.content ?? ''))
   })
-  return [{ role: 'system', content: systemPrompt }, ...cleanHistory.slice(-CHAT_HISTORY_LIMIT)]
+  return [{ role: 'system', content: systemPrompt }, ...cleanHistory.slice(-(settingsStore.get().contextLength ?? 10))]
 }
 
 function normalizeTitle(text) {
@@ -653,7 +535,10 @@ function parseAPIError(err, providerId) {
     return { type: 'server', title: 'Provider unavailable', body: withDetails(`${label} is currently down or overloaded. Try again shortly.`) }
   }
   if (lower.includes('econnrefused') || lower.includes('failed to fetch') || status === 0) {
-    return { type: 'network', title: 'Connection failed', body: withDetails(providerId === 'ollama' ? 'Cannot reach Ollama. Make sure it is running locally.' : 'Network error - check your internet connection.') }
+    const networkBody = providerId === 'ollama'
+      ? 'Cannot reach Ollama. Make sure it is running on your machine (try running "ollama serve" in a terminal).'
+      : `Could not connect to ${label}. This is usually a bad network connection — check that you're online and try again.`
+    return { type: 'network', title: 'Connection failed', body: withDetails(networkBody) }
   }
   return { type: 'unknown', title: 'Something went wrong', body: msg || 'An unexpected error occurred.' }
 }
@@ -676,7 +561,7 @@ function buildWorkflowContext(state) {
 
 function buildConversationMemory(history, outputFiles = [], workflowState = null) {
   const lines = ['## CONVERSATION MEMORY']
-  const recent = history.slice(-CHAT_HISTORY_LIMIT)
+  const recent = history.slice(-(settingsStore.get().contextLength ?? 10))
 
   const userTurns = recent
     .filter(m => m.role === 'user')
@@ -732,6 +617,8 @@ export default function ChatPanel({
   onStepStart,
   onStepOutput,
   onStepCmdUpdate,
+  context = 'workspace',
+  onConvertStepToNode,
 }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -1190,17 +1077,24 @@ export default function ChatPanel({
         attachedFiles,
       )
 
-      const systemPrompt = buildSystemPrompt(
-        toolsBlock ?? '## Tools\nffmpeg available\nffprobe available',
-        [
-          buildFileBlock(activeFile, probeData, projectFiles, fullText, attachedFiles),
-          textFileContextBlock,
-        ].filter(Boolean).join('\n\n'),
-        buildProjectStateBlock(projectFiles, outputFiles, project?.folderPath, attachedFiles),
-        paths.outputDir,
-        memoryBlock,
-        buildWorkflowContext(workflowStateRef.current),
-      )
+      const systemPrompt = context === 'node'
+        ? buildNodePrompt({
+            toolsBlock: toolsBlock ?? '## Tools\nffmpeg available\nffprobe available',
+            projectFiles,
+          })
+        : buildWorkspacePrompt({
+            toolsBlock: toolsBlock ?? '## Tools\nffmpeg available\nffprobe available',
+            fileBlock: [
+              buildFileBlock(activeFile, probeData, projectFiles, fullText, attachedFiles),
+              textFileContextBlock,
+            ].filter(Boolean).join('\n\n'),
+            projectStateBlock: buildProjectStateBlock(projectFiles, outputFiles, project?.folderPath, attachedFiles),
+            outputDir: paths.outputDir,
+            workflowContext: [
+              memoryBlock,
+              buildWorkflowContext(workflowStateRef.current),
+            ].filter(Boolean).join('\n\n'),
+          })
 
       const requestMessages = buildRequestMessages(systemPrompt, historyRef.current)
       let messagesForAI = requestMessages
@@ -1229,6 +1123,11 @@ export default function ChatPanel({
 
       const raw = await streamChat(messagesForAI, {
         signal: aiAbortRef.current.signal,
+        onStatus: (statusObj) => {
+          setMessages(prev => prev.map(m =>
+            m.id === streamId ? { ...m, statusMessage: statusObj.message } : m,
+          ))
+        },
         onDelta: (delta) => {
           setMessages(prev => prev.map(m =>
             m.id === streamId ? { ...m, content: (m.content || '') + delta } : m,
@@ -1285,6 +1184,12 @@ export default function ChatPanel({
 
       if (parsed.mode === 'chat' || parsed.mode === 'clarify') {
         addAiMessage(parsed.message)
+        setLoading(false)
+        return
+      }
+
+      if (parsed.mode === 'pipeline') {
+        addAiMessage(JSON.stringify({ __type: 'pipeline_preview', pipeline: parsed }), true)
         setLoading(false)
         return
       }
@@ -1365,6 +1270,7 @@ export default function ChatPanel({
                 canEdit={message.role === 'user' && message.type === 'text' && !loading}
                 onEdit={() => beginEditPrompt(message)}
                 onRedo={() => redoPrompt(message)}
+                onConvertStepToNode={onConvertStepToNode}
               />
         ))}
         <div ref={endRef} />
@@ -1516,15 +1422,27 @@ export default function ChatPanel({
 
 function ApprovalCard({ workflow, onAllow, onDismiss }) {
   const [expanded, setExpanded] = useState(null)
-  const steps = workflow?.steps ?? []
+  const [steps, setSteps] = useState(workflow?.steps ?? [])
 
   function getStepCmd(step) {
-    if (step.command) return step.command
+    if (step.command !== undefined) return step.command
     if (step.type === 'rename') return `rename  "${step.from}"  ->  "${step.to}"`
     if (step.type === 'delete') return `delete  "${step.path}"`
     if (step.type === 'move')   return `move  "${step.from}"  ->  "${step.to}"`
     if (step.type === 'write')  return `write  "${step.path}"`
     return null
+  }
+
+  function handleCmdChange(index, newCmd) {
+    setSteps(prev => {
+      const next = [...prev]
+      next[index] = { ...next[index], command: newCmd }
+      return next
+    })
+  }
+
+  function handleAllow() {
+    onAllow({ ...workflow, steps })
   }
 
   return (
@@ -1544,6 +1462,7 @@ function ApprovalCard({ workflow, onAllow, onDismiss }) {
         <div className="approval-steps">
           {steps.map((step, i) => {
             const cmd = getStepCmd(step)
+            const isShell = step.command !== undefined
             const isOpen = expanded === i
             return (
               <div key={step.id ?? i} className={`approval-step ${cmd ? 'has-cmd' : ''} ${isOpen ? 'open' : ''}`}>
@@ -1565,7 +1484,21 @@ function ApprovalCard({ workflow, onAllow, onDismiss }) {
                   )}
                 </div>
                 {isOpen && cmd && (
-                  <div className="approval-cmd">{cmd}</div>
+                  <div className="approval-cmd">
+                    {isShell ? (
+                      <textarea 
+                        className="approval-cmd-input" 
+                        value={step.command} 
+                        onChange={(e) => handleCmdChange(i, e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        spellCheck={false}
+                        rows={Math.min(Math.max(step.command.split('\n').length, 2), 6)}
+                        style={{ width: '100%', background: 'transparent', color: 'inherit', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px', padding: '6px', fontSize: '11px', fontFamily: 'monospace', resize: 'vertical' }}
+                      />
+                    ) : (
+                      cmd
+                    )}
+                  </div>
                 )}
               </div>
             )
@@ -1573,7 +1506,7 @@ function ApprovalCard({ workflow, onAllow, onDismiss }) {
         </div>
       )}
       <div className="approval-actions">
-        <button className="approval-btn allow" onClick={onAllow}>
+        <button className="approval-btn allow" onClick={handleAllow}>
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
             <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
@@ -1585,7 +1518,7 @@ function ApprovalCard({ workflow, onAllow, onDismiss }) {
   )
 }
 
-function Message({ msg, canEdit, onEdit, onRedo }) {
+function Message({ msg, canEdit, onEdit, onRedo, onConvertStepToNode }) {
   if (msg.type === 'thinking') {
     return (
       <div className="msg ai">
@@ -1598,6 +1531,15 @@ function Message({ msg, canEdit, onEdit, onRedo }) {
 
   if (msg.type === 'streaming') {
     return <StreamingBubble msg={msg} />
+  }
+
+  if (typeof msg.content === 'string' && msg.content.includes('__type":"pipeline_preview')) {
+    try {
+      const data = JSON.parse(msg.content)
+      if (data.__type === 'pipeline_preview') {
+        return <PipelinePreviewCard pipeline={data.pipeline} onAddStep={onConvertStepToNode} />
+      }
+    } catch {}
   }
 
   return (
@@ -1619,6 +1561,62 @@ function Message({ msg, canEdit, onEdit, onRedo }) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function PipelinePreviewCard({ pipeline, onAddStep }) {
+  const STEP_COLORS = {
+    shell:'#4A6BC8', whisper:'#8B35CC', ai_analyse:'#6B1FA8',
+    ffmpeg_clip:'#1B8FAD', for_each_shell:'#1B9FD4',
+    scale_916:'#27AE85', burn_captions:'#C8A020', compress:'#E67E22',
+  }
+  const [added, setAdded] = useState(new Set())
+
+  const steps = pipeline?.steps ?? []
+
+  return (
+    <div className="pipeline-preview-card">
+      <div className="pp-header">
+        <span className="pp-icon">⬡</span>
+        <span className="pp-name">{pipeline?.name ?? 'Pipeline'}</span>
+        <span className="pp-count">{steps.length} steps</span>
+      </div>
+      <div className="pp-desc">{pipeline?.description ?? ''}</div>
+      <div className="pp-steps">
+        {steps.map((step, i) => (
+          <div key={i} className="pp-step">
+            <div className="pp-step-left">
+              <div className="pp-step-dot" style={{ background: STEP_COLORS[step.type] ?? '#888' }} />
+              <span className="pp-step-title">{step.title}</span>
+              <span className="pp-step-type" style={{ color: STEP_COLORS[step.type] }}>
+                {step.type}
+              </span>
+            </div>
+            <button
+              className={`pp-add-btn ${added.has(i) ? 'added' : ''}`}
+              onClick={() => {
+                onAddStep?.(step)
+                setAdded(prev => new Set([...prev, i]))
+              }}
+              disabled={added.has(i)}
+            >
+              {added.has(i) ? '✓ Added' : '→ Node'}
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        className="pp-add-all-btn"
+        onClick={() => {
+          const stepsToAdd = steps.filter((_, i) => !added.has(i))
+          if (stepsToAdd.length === 0) return
+          onAddStep?.(stepsToAdd)
+          setAdded(new Set(steps.map((_,i) => i)))
+        }}
+      >
+        Add all steps to pipeline
+      </button>
     </div>
   )
 }
@@ -1657,7 +1655,9 @@ function StreamingBubble({ msg }) {
   const content = msg.content || ''
   
   let status = 'Thinking...'
-  if (content.length > 0) {
+  if (msg.statusMessage) {
+    status = msg.statusMessage
+  } else if (content.length > 0) {
     if (content.includes('"steps"')) {
       status = 'Structuring workflow steps...'
     } else if (content.includes('"mode"')) {

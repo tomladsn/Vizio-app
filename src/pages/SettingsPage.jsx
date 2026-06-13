@@ -382,6 +382,17 @@ function ProviderConfig({ provider, settings, onUpdate }) {
             </label>
             <div className="field-help" style={{ marginLeft: '22px' }}>When enabled, the AI will immediately execute its planned tasks.</div>
           </div>
+          <div className="advanced-field">
+            <label className="field-label">Chat context length</label>
+            <input
+              type="number"
+              min="2" max="50" step="1"
+              className="key-input"
+              value={settings.contextLength ?? 10}
+              onChange={e => onUpdate('contextLength', Number(e.target.value))}
+            />
+            <div className="field-help">Number of previous messages the AI remembers.</div>
+          </div>
         </div>
       </section>
     </>

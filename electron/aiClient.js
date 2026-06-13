@@ -1,8 +1,3 @@
-/**
- * Provider-agnostic AI client — runs in main process only.
- * API keys are never sent to the renderer.
- */
-
 function getProviderBaseUrl(providerId) {
   const baseUrls = {
     openai: 'https://api.openai.com/v1',
@@ -97,14 +92,15 @@ async function readOpenAIStream(res, onDelta, signal) {
     if (done) break
 
     buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed.startsWith('data:')) continue
-      const data = trimmed.slice(5).trim()
+    let newlineIndex
+    while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim()
+      buffer = buffer.slice(newlineIndex + 1)
+      
+      if (!line.startsWith('data:')) continue
+      const data = line.slice(5).trim()
       if (data === '[DONE]') continue
+      
       try {
         const json = JSON.parse(data)
         const delta = json.choices?.[0]?.delta?.content
@@ -135,14 +131,15 @@ async function readAnthropicStream(res, onDelta, signal) {
     if (done) break
 
     buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
+    let newlineIndex
+    while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim()
+      buffer = buffer.slice(newlineIndex + 1)
 
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed.startsWith('data:')) continue
-      const data = trimmed.slice(5).trim()
+      if (!line.startsWith('data:')) continue
+      const data = line.slice(5).trim()
       if (!data || data === '[DONE]') continue
+      
       try {
         const json = JSON.parse(data)
         if (json.type === 'content_block_delta' && json.delta?.text) {
@@ -156,7 +153,7 @@ async function readAnthropicStream(res, onDelta, signal) {
   return fullText.trim()
 }
 
-export async function callAI(messages, config, { retries = 3, signal } = {}) {
+export async function callAI(messages, config, { retries = 3, onStatus, signal } = {}) {
   let { baseUrl, apiKey, model, providerId } = config
   const maxTokens = Number(config.maxTokens) > 0 ? Number(config.maxTokens) : 2048
   const temperature = Number.isFinite(Number(config.temperature)) ? Number(config.temperature) : 0.2
@@ -206,10 +203,11 @@ export async function callAI(messages, config, { retries = 3, signal } = {}) {
         })
       }
 
-      if (res.status === 429) {
-        const retryAfter = parseInt(res.headers.get('retry-after') ?? '0', 10)
+      if (res.status === 429 || res.status >= 500) {
+        const retryAfter = parseInt(res.headers?.get('retry-after') ?? '0', 10)
         const wait = retryAfter > 0 ? retryAfter * 1000 : Math.min(2000 * attempt, 10000)
         if (attempt < retries) {
+          onStatus?.({ type: 'retry', message: `Rate limit hit, retrying in ${Math.round(wait/1000)}s...` })
           await sleep(wait, signal)
           continue
         }
@@ -228,6 +226,7 @@ export async function callAI(messages, config, { retries = 3, signal } = {}) {
       if (err.cancelled || signal?.aborted) throw err
       if (attempt === retries) throw err
       if (err.message?.includes('Rate limit')) throw err
+      onStatus?.({ type: 'retry', message: `Connection error, retrying in ${attempt}s...` })
       await sleep(1000 * attempt, signal)
     }
   }
@@ -235,7 +234,7 @@ export async function callAI(messages, config, { retries = 3, signal } = {}) {
   return ''
 }
 
-export async function streamAI(messages, config, { onDelta, signal } = {}) {
+export async function streamAI(messages, config, { onDelta, onStatus, signal } = {}) {
   let { baseUrl, apiKey, model, providerId } = config
   const maxTokens = Number(config.maxTokens) > 0 ? Number(config.maxTokens) : 2048
   const temperature = Number.isFinite(Number(config.temperature)) ? Number(config.temperature) : 0.2

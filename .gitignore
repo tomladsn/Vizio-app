@@ -31,8 +31,17 @@ lerna-debug.log*
 .env.production.local
 *.pem
 
-# Local settings store (contains API keys / personal config)
+
 src/store/settingsStore.js
+src/store/systemPrompts.js
+resources/
+
+# Graphify
+graphify-out/
+.graphify/
+__pycache__/
+venv/
+.venv/
 
 # OS files
 .DS_Store

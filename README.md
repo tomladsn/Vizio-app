@@ -1,14 +1,13 @@
 <div align="center">
 
-<img src="icon.png" alt="Vizio" width="100" />
+<img src="public/icon.ico" alt="Vizio" width="120" />
 
 # Vizio
 
-**AI-powered desktop application for intelligent, automated media processing**
+**From raw files to ready — just describe it.**
 
 [![Electron](https://img.shields.io/badge/Electron-28-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://reactjs.org/)
-[![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/License-MIT-green)](#license)
 
@@ -16,227 +15,167 @@
 
 ---
 
-## ✨ Overview
+Vizio is a desktop AI agent for media processing. You describe what you want — compress for Twitter, generate captions, extract clips from a long video, batch convert a folder — and Vizio plans the steps, runs the commands, and fixes its own errors automatically.
 
-**Vizio** is an AI-powered media workspace that transforms natural language instructions into complex, automated workflows. By bridging the gap between human intent and technical toolchains, Vizio enables anyone to perform advanced media operations—like batch compression, AI transcription, or programmatic image editing—without writing a single line of code.
-
-The application acts as an intelligent orchestrator, leveraging large language models (LLMs) to plan and execute multi-step pipelines using a suite of professional media tools including `ffmpeg`, `whisper`, `yt-dlp`, `ImageMagick`, and more.
+It is not a video editor. There is no timeline, no drag-and-drop trim bar. It is the tool you reach for when you have files that need work and you do not want to spend an hour learning ffmpeg flags or writing shell scripts to do it.
 
 ---
 
-## 🚀 Key Features
+## How it works
 
-| Feature | Description |
+You type a goal in plain English. Vizio sends that to an LLM alongside your file metadata and a list of available tools. The model returns a structured JSON workflow — a list of steps with shell commands. Vizio executes each step, streams progress back to you, and if a command fails it sends the error back to the AI, gets a corrected command, and retries automatically up to three times before giving up and explaining what went wrong.
+
+```
+You type:   "generate youtube shorts from this gameplay video"
+
+Vizio:      Step 1 — Whisper transcribes the video → .srt
+            Step 2 — AI reads the transcript, picks the best 5 moments → .json
+            Step 3 — ffmpeg clips each timestamp → clip_1.mp4 … clip_5.mp4
+            Step 4 — Whisper captions each clip at 2 words/line → .srt per clip
+            Step 5 — ffmpeg burns captions + scales to 1080×1920 → final shorts
+
+            Done. 5 files in your output folder.
+```
+
+Every command that ran, every retry, every fix the AI made — all of it is in the session log.
+
+---
+
+## What makes it different
+
+**It executes, not just suggests.** Most "AI + ffmpeg" tools generate the command and copy it to your clipboard. Vizio runs it, watches the exit code, and handles failures without asking you.
+
+**Self-healing.** When a step fails — wrong codec, missing filter, bad path — the AI reads the actual stderr, writes a corrected command, and retries. You watch it fix itself.
+
+**Everything is saved.** Projects have their own folders. Every chat, every session log, every output file is organized and persists between sessions. Your conversation with the AI has full context of what ran before.
+
+**Bring your own key, keep your own files.** Nothing is uploaded to a cloud service. Your media stays on your machine. API keys are encrypted via the OS credential manager (Windows DPAPI). The AI providers you connect to see only what you send them.
+
+**Pipelines for repeated work.** If you do the same multi-step workflow regularly — like the YouTube Shorts pipeline above — you can save it as a pipeline on the Node page and run it on any new file without prompting the AI again.
+
+---
+
+## Screenshots
+
+| | |
 |---|---|
-| 🤖 **AI Workflow Generation** | Describe a goal; the agent plans and executes a multi-step workflow |
-| 🔁 **Self-Healing Execution** | On failure, the AI automatically diagnoses the error and retries with a corrected command (up to 3 attempts) |
-| 📁 **Project Management** | Organize your work into projects with dedicated input, output, and session folders |
-| 💬 **Persistent Chat History** | Every conversation is saved per-project with named chat sessions |
-| 🖼️ **Media Library** | Visual browser for all input/output files with drag-and-drop import |
-| 🎬 **Live Preview Panel** | Preview video, audio, and image outputs directly inside the app |
-| 🛠️ **Tool Manager** | Detect, install, and manage all required external tools from one page |
-| 🌐 **Multi-Provider AI** | Groq, Anthropic, OpenAI, Ollama (local), or any OpenAI-compatible endpoint |
-| 🎨 **Themeable UI** | Dark / light / midnight themes with multiple accent color choices |
-| 📦 **Windows Installer** | Packages as a one-click NSIS `.exe` installer via `electron-builder` |
+| ![Workspace](docs/workspace.png) | **Workspace** — media library left, session log center, AI chat right |
+| ![Session log](docs/session-log.png) | **Session log** — every command, attempt, and fix logged live |
+| ![Settings](docs/settings.png) | **Settings** — provider, model, theme, accent color |
 
 ---
 
-## 🖥️ Screenshots
+## Supported tools
 
-> *The app consists of three main pages accessible via the top menu bar.*
+Vizio detects these automatically. Missing ones can be installed from the Tools page with one click on Windows.
 
-### Main Workspace
-The main page shows the **Media Library** (left), **Chat Panel** (center), and **Preview Panel** (right). Drag files onto the window from anywhere to instantly add them to the project library.
-
-### Tools Page
-Scan for installed tools, view installation instructions per-OS, and one-click install missing dependencies directly from within the app.
-
-### Settings Page
-Configure your AI provider (Groq, Anthropic, OpenAI, Ollama), paste API keys, choose a model, and tune temperature/max-tokens — plus pick your preferred theme and accent color.
-
----
-
-## 🏗️ Architecture & Capabilities
-
-Vizio is built on a robust, tool-agnostic architecture designed for extensibility and reliability. The "Base Build" provides a powerful core that manages the entire lifecycle of a media task.
-
-### 🧠 Agentic Workflow Engine
-The heart of the application is a sophisticated orchestration layer that translates vague user requests into deterministic JSON-based workflows. This engine doesn't just run commands; it understands dependencies, manages file states, and maintains a persistent memory of the project environment.
-
-### 🛠️ Multi-Tool Integration Layer
-While many tools are supported, the architecture treats each as a swappable plugin. Whether it's `ffmpeg` for encoding, `yt-dlp` for ingestion, or `whisper` for intelligence, Vizio provides a unified interface for tool detection, configuration, and execution.
-
-### 🩺 Self-Healing Execution Loop
-Execution is never "fire and forget." The base build includes a recursive validation loop. If a tool exits with an error, the AI analyzes the logs, identifies the root cause (e.g., a missing codec or a syntax error), and automatically re-plans the step—correcting itself in real-time.
-
-### 📂 Integrated Workspace Manager
-The architecture revolves around a "Project-First" philosophy. Each project is a self-contained ecosystem with its own:
-- **Media Library**: Tracks inputs, derivatives, and final outputs.
-- **Session History**: Deep-linkable logs of every AI decision and tool output.
-- **Contextual State**: Metadata and file structures are indexed and fed back into the AI to ensure high-precision workflow generation.
+| Tool | What it does |
+|---|---|
+| **ffmpeg** | Video/audio encoding, filtering, trimming, captioning, scaling |
+| **ffprobe** | Reads codec, resolution, duration, bitrate metadata |
+| **Whisper** | Speech-to-text — generates SRT/VTT/TXT from any audio or video |
+| **yt-dlp** | Downloads video and audio from YouTube and 1000+ other sites |
+| **ImageMagick** | Frame-level image manipulation, conversion, compositing |
 
 ---
 
-## ⚙️ How It Works
+## Supported AI providers
 
-```
-User types a goal  →  Agent analyzes project state & media metadata
-                   →  AI generates a multi-step JSON workflow
-                   →  Each step runs as a tool-specific shell command
-                   →  Exit 0 → Proceed to next step
-                   →  Error  → AI diagnoses, fixes, and retries (max 3×)
-                   →  Outputs saved to project/output/
-                   →  Results updated in Media Library & Preview
-```
-
-The AI never writes brittle one-liners — it produces a structured workflow object with individually trackable steps, real-time progress, and a full session log.
+| Provider | Notes |
+|---|---|
+| **Groq** | Recommended for free users — fast inference, generous free tier |
+| **Anthropic** | Claude 3.5 Sonnet / Opus |
+| **OpenAI** | GPT-4o / GPT-4 Turbo |
+| **Ollama** | Fully local, no API key, no internet required |
+| **OpenRouter** | Access to many models through one key |
+| **Any OpenAI-compatible endpoint** | Point at any custom base URL |
 
 ---
 
-## 🛠️ Supported External Tools
+## Getting started
 
-The **Tools** page detects and (on Windows) auto-installs all of these:
-
-| Tool | Purpose | Install |
-|---|---|---|
-| **ffmpeg** | Video/audio encoding, filtering, trimming | `winget install Gyan.FFmpeg` |
-| **ffprobe** | Media file inspection (ships with ffmpeg) | — |
-| **Python 3.11** | Runtime for pip-based tools | `winget install Python.Python.3.11` |
-| **OpenAI Whisper** | Speech-to-text, subtitles (SRT/VTT) | `pip install openai-whisper` |
-| **yt-dlp** | Download from YouTube & 1000+ sites | `pip install yt-dlp` |
-| **ImageMagick** | Frame-level image manipulation | `winget install ImageMagick.ImageMagick` |
-
----
-
-## 🧠 Supported AI Providers
-
-Configure any of these in **Settings → API & models**:
-
-| Provider | Models | Key Required |
-|---|---|---|
-| **Groq** | `llama-3.3-70b-versatile`, `mixtral-8x7b` | ✅ |
-| **Anthropic** | `claude-opus-4-5`, `claude-sonnet-4-5` | ✅ |
-| **OpenAI** | `gpt-4o`, `gpt-4-turbo` | ✅ |
-| **Ollama** | Any locally pulled model | ❌ (local) |
-| **OpenAI-compatible** | Any custom endpoint | Optional |
-
----
-
-## 📦 Prerequisites
-
-- **Node.js** 18+ and **npm**
-- **ffmpeg** installed and on your system `PATH`
-- An API key for your chosen AI provider (or Ollama running locally)
-
----
-
-## 🚀 Getting Started
-
-### 1. Clone the repository
+**Requirements:** Node.js 18+, npm, ffmpeg on your PATH (or use the bundled version).
 
 ```bash
+# Clone
 git clone https://github.com/your-username/Vizio-app.git
 cd Vizio-app
-```
 
-### 2. Install dependencies
-
-```bash
+# Install
 npm install
-```
 
-### 3. Configure your AI provider
-
-Launch the app and go to **Settings → API & models**. Paste your API key and choose a model. For Ollama, just point the endpoint at `http://localhost:11434`.
-
-### 4. Run in development mode
-
-```bash
+# Run
 npm run dev
 ```
 
-This starts the Vite dev server and Electron simultaneously using `concurrently`.
-
-### 5. Build the Windows installer
+On first launch, create a project by pointing it at a folder. Then open Settings and add your API key. Groq has a free tier — sign up at [console.groq.com](https://console.groq.com) and paste the key in. You are ready.
 
 ```bash
+# Build the Windows installer
 npm run build
+# → dist-electron/Vizio-Setup-0.1.0.exe
 ```
 
-The packaged `.exe` installer is output to `dist-electron/`. The installer:
-- Lets users choose the install directory
-- Creates a desktop shortcut
-- Bundles everything — no separate Node.js install needed on end-user machines
+---
+
+## Project structure
+
+```
+Vizio-app/
+├── electron/          Main process — IPC handlers, ffmpeg execution, AI client
+│   ├── main.js        Workflow runner, pipeline executor, session logger
+│   ├── ffmpeg.js      runFfmpeg, probeFiles, scanTools, binary resolution
+│   ├── aiClient.js    Provider-agnostic callAI + streaming
+│   ├── keyStore.js    OS-encrypted API key storage via safeStorage
+│   └── projectStore.js  Project, media, chat, and session file management
+│
+├── src/               Renderer — React + Vite
+│   ├── pages/
+│   │   ├── MainPage.jsx      Three-panel workspace
+│   │   ├── NodePage.jsx      Visual pipeline builder
+│   │   ├── ToolsPage.jsx     Tool detection and install
+│   │   └── SettingsPage.jsx  Provider config and appearance
+│   ├── components/
+│   │   ├── chat/             ChatPanel — AI conversation, approval cards
+│   │   ├── preview/          PreviewPanel — before/after, output files, session log
+│   │   └── library/          MediaLibrary — file browser and mention system
+│   └── store/
+│       └── settingsStore.js  Provider, model, and appearance preferences
+│
+└── resources/
+    └── bin/win32/     Bundled ffmpeg, ffprobe, ffplay, yt-dlp binaries
+```
 
 ---
 
-## 🎯 Usage Walkthrough
+## Development scripts
 
-1. **Create or open a project** — Choose a folder where media files and outputs will live.
-2. **Add media files** — Drag files onto the app window, or use the Media Library panel to browse existing project files.
-3. **Select context files** — In the chat panel, click the attachment icon to select one or more files to include in the AI's context.
-4. **Describe your goal** — Type your request in plain English: *"Trim the first 10 seconds, add subtitles, and export as 1080p MP4"*.
-5. **Review the workflow** — The agent proposes a step-by-step plan before executing.
-6. **Watch it run** — Real-time progress per step, with automatic retry on failure.
-7. **Preview the output** — Click any output file to preview it inline. Open it in your system player via the preview panel.
-
----
-
-## 🧩 Project Structure Details
-
-### Session Logging
-
-Every workflow run creates a structured JSON session log at `<project>/sessions/<sessionId>.json`, containing:
-- The original user goal
-- The full workflow plan
-- Per-step status (`running` / `completed` / `failed`)
-- All commands, stdout, stderr, and AI fix attempts
-
-### Batch Processing
-
-The workflow engine supports a `batch_shell` step type that automatically fans out a single command template across multiple input files — for example, compressing an entire folder of videos in one go.
-
-### Non-Shell Steps
-
-Beyond `shell` commands, the agent can also:
-- **rename** / **move** files within the project
-- **delete** media files
-- **write** text files (e.g., subtitle files, scripts)
+```bash
+npm run dev        # Vite + Electron (hot reload)
+npm run build      # Production build + NSIS installer
+npm run codemap    # Regenerate CODEMAP.md (architecture snapshot)
+npm run test-bins  # Verify all bundled binaries are working
+```
 
 ---
 
-## 🔧 Development Scripts
+## Contributing
 
-| Command | Description |
-|---|---|
-| `npm run dev` | Start Vite + Electron in development mode |
-| `npm run dev:web` | Start Vite only (browser preview) |
-| `npm run build` | Build React bundle + package Electron app |
-| `npm run preview` | Preview the Vite production build |
-| `npm run codemap` | Regenerate `CODEMAP.md` (project structure snapshot) |
+Issues and pull requests are welcome. If you find a bug, please include the session log from the relevant run — it contains the exact commands and errors that will make it much faster to diagnose.
 
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Commit your changes (`git commit -m 'Add my feature'`)
-4. Push to the branch (`git push origin feature/my-feature`)
-5. Open a Pull Request
+1. Fork the repo
+2. Create a branch — `git checkout -b fix/something`
+3. Commit and push
+4. Open a pull request
 
 ---
 
-## 📄 License
+## License
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+MIT — see [LICENSE](LICENSE).
 
 ---
 
 <div align="center">
-
-Vizio — built with ❤️ using [Electron](https://www.electronjs.org/), [React](https://reactjs.org/), [Vite](https://vitejs.dev/), and the power of AI.
-
+Built with Electron, React, Vite, and whatever AI provider you have a key for.
 </div>
