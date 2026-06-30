@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('session:readLog', sessionId),
   listSessionFiles: (sessionId, projectDir) =>
     ipcRenderer.invoke('session:listFiles', { sessionId, projectDir }),
+  listProjectSessions: (projectDir) =>
+    ipcRenderer.invoke('session:listForProject', { projectDir }),
 
   // File opening
   openFile: (filePath) =>

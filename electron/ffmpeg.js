@@ -1,4 +1,4 @@
-import { exec, spawn }  from 'child_process'
+import { exec, spawn, execFile }  from 'child_process'
 import { promisify }    from 'util'
 import path             from 'path'
 import fs               from 'fs'
@@ -6,25 +6,59 @@ import os               from 'os'
 import { app }          from 'electron'
 
 const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
 function resolveBin(name) {
   const exe = process.platform === 'win32' ? `${name}.exe` : name
+  const platform = process.platform
 
+  // 1. Packaged/production candidate paths
   if (app.isPackaged) {
-    const packagedPath = path.join(process.resourcesPath, 'bin', exe)
-    if (fs.existsSync(packagedPath)) {
-      console.log(`[bin] ${name} -> bundled`)
-      return packagedPath
+    const candidates = [
+      path.join(process.resourcesPath, 'bin', exe),
+      path.join(process.resourcesPath, 'bin', platform, exe),
+      path.join(process.resourcesPath, exe),
+      path.join(app.getAppPath(), '..', 'bin', exe),
+      path.join(app.getAppPath(), '..', 'bin', platform, exe),
+    ]
+
+    for (const p of candidates) {
+      if (fs.existsSync(p)) {
+        if (platform !== 'win32') {
+          try {
+            const stats = fs.statSync(p)
+            if ((stats.mode & 0o100) === 0) {
+              fs.chmodSync(p, 0o755)
+              console.log(`[bin] ${name} -> chmod 755 applied`)
+            }
+          } catch (e) {
+            console.warn(`[bin] Failed to chmod ${name}:`, e.message)
+          }
+        }
+        console.log(`[bin] ${name} -> bundled (packaged) at: ${p}`)
+        return p
+      }
     }
   }
 
-  const devPath = path.join(process.cwd(), 'resources', 'bin', process.platform, exe)
-  if (fs.existsSync(devPath)) {
-    console.log(`[bin] ${name} -> dev local`)
-    return devPath
+  // 2. Development candidate paths
+  const appPath = app.getAppPath()
+  const devCandidates = [
+    path.join(appPath, 'resources', 'bin', platform, exe),
+    path.join(process.cwd(), 'resources', 'bin', platform, exe),
+    path.join(appPath, 'resources', 'bin', exe),
+    path.join(process.cwd(), 'resources', 'bin', exe),
+    path.join(appPath, '..', 'resources', 'bin', platform, exe),
+  ]
+
+  for (const p of devCandidates) {
+    if (fs.existsSync(p)) {
+      console.log(`[bin] ${name} -> bundled (dev) at: ${p}`)
+      return p
+    }
   }
 
-  console.warn(`[bin] ${name} -> system PATH`)
+  console.warn(`[bin] ${name} -> system PATH fallback`)
   return name
 }
 
@@ -69,7 +103,7 @@ function parseProgress(line, durationSec) {
 }
 
 // ─── Run ffmpeg with real-time progress ──────────────────────────────────────
-export function runFfmpeg(command, { onProgress, onOutput, durationSec, signal } = {}) {
+export function runFfmpeg(command, { onProgress, onOutput, onStderr, durationSec, signal } = {}) {
   return new Promise((resolve) => {
     const cmd     = cleanCommand(command)
     const parts   = cmd.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? []
@@ -115,6 +149,7 @@ export function runFfmpeg(command, { onProgress, onOutput, durationSec, signal }
       const text = chunk.toString()
       stderr += text
       onOutput?.({ stream: 'stderr', text })
+      onStderr?.(text)
       if (onProgress) {
         const pct = parseProgress(text, durationSec)
         if (pct !== null) onProgress(pct)
@@ -199,7 +234,6 @@ export const KNOWN_TOOLS = [
       exe: 'magick.exe',
     },
   },
-  { name: 'python', category: 'System', description: 'Python runtime (needed for AI tools like whisper)', bundled: false },
 ]
 
 const SCAN_CACHE_MS = 30_000
@@ -369,10 +403,25 @@ async function findPythonCandidates(max = 3) {
   return candidates
 }
 
+async function execFileCheck(file, args = [], timeout = EXEC_TIMEOUT_MS) {
+  try {
+    const { stdout, stderr } = await execFileAsync(file, args, {
+      timeout,
+      windowsHide: true,
+      maxBuffer: 512 * 1024,
+    })
+    const output = (stdout || stderr || '').trim()
+    if (!output) return { success: false }
+    return { success: true, version: output.split('\n')[0].trim().slice(0, 80) }
+  } catch (err) {
+    return { success: false }
+  }
+}
+
 async function detectBundledBin(binPath, flag, toolKey) {
   const systemCmd = toolKey === 'ytdlp' ? 'yt-dlp' : toolKey
   const bundled = binPath !== systemCmd
-  const res = await execCheck(`${quoteCmd(binPath)} ${flag}`)
+  const res = await execFileCheck(binPath, [flag])
   return res.success
     ? { available: true, version: res.version, bundled }
     : { available: false, version: null, bundled: false }
@@ -493,12 +542,6 @@ export async function scanTools({ force = false } = {}) {
       const det = await detectBundledBin(BIN.ffplay, '-version', 'ffplay')
       return { ...base, ...det, bundled: det.bundled ?? true }
     }
-    if (meta.name === 'python') {
-      if (pythonCandidates.length === 0) return base
-      const count = pythonCandidates.length
-      const label = count > 1 ? `${pythonCandidates[0].version} (+${count - 1} more)` : pythonCandidates[0].version
-      return { ...base, available: true, version: label, bundled: false }
-    }
     if (meta.name === 'yt-dlp') {
       const det = await detectYtDlp(pythonCandidates)
       return { ...base, ...det }
@@ -550,20 +593,34 @@ export async function scanToolsWithBlock({ force = false } = {}) {
 
 // ─── Logger (Electron version) ────────────────────────────────────────────────
 // Saves to app.getPath('userData')/logs/ — always a writable, predictable path
-export function createLogger(sessionId) {
+export function createLogger(sessionId, projectPath = '') {
   if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true })
 
   const logFile = path.join(LOG_DIR, `session-${sessionId}.json`)
 
-  const data = {
-    sessionId,
-    startedAt:  new Date().toISOString(),
-    status:     'in_progress',
-    mediaFiles: [],
-    userGoal:   '',
-    workflow:   null,
-    steps:      [],
-    completedAt: null,
+  let data = null
+  if (fs.existsSync(logFile)) {
+    try {
+      data = JSON.parse(fs.readFileSync(logFile, 'utf-8'))
+    } catch (e) {
+      console.error('Failed to parse existing log file:', e)
+    }
+  }
+
+  if (!data) {
+    data = {
+      sessionId,
+      projectPath,
+      startedAt:  new Date().toISOString(),
+      status:     'in_progress',
+      mediaFiles: [],
+      userGoal:   '',
+      workflow:   null,
+      steps:      [],
+      completedAt: null,
+    }
+  } else if (projectPath) {
+    data.projectPath = projectPath
   }
 
   function save() {

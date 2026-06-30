@@ -195,6 +195,7 @@ export default function App() {
             onChatChange={setActiveChatId}
             onRegisterLibraryReload={fn => { libraryReloadRef.current = fn }}
             toolsBlock={toolsBlock}
+            page={page}
           />
         </div>
         <div style={{ display: page === 'tools' ? 'contents' : 'none' }}>
@@ -219,6 +220,7 @@ export default function App() {
             onChatSaved={() => {}}
             onSessionId={setSessionId}
             onTaskUpdate={setTasks}
+            page={page}
           />
         </div>
       </div>

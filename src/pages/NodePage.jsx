@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import ChatPanel from '../components/chat/ChatPanel'
+import MediaLibrary from '../components/library/MediaLibrary'
 import { settingsStore } from '../store/settingsStore'
 import './NodePage.css'
 
@@ -118,9 +119,11 @@ export default function NodePage({
   onChatSaved,
   onSessionId,
   onTaskUpdate,
+  page,
 }) {
   const [projectFiles, setProjectFiles] = useState(propProjectFiles ?? [])
   const [outputFiles,  setOutputFiles]  = useState(propOutputFiles ?? [])
+  const [reloadTrigger, setReloadTrigger] = useState(0)
   const [pipelines,     setPipelines]     = useState(() => loadLocalPipelines())
   const [activePipeId,  setActivePipeId]  = useState(pipelines[0]?.id ?? null)
   const [selectedStepId,setSelectedStep]  = useState(null)
@@ -133,6 +136,13 @@ export default function NodePage({
   const [nodeChats,     setNodeChats]     = useState([])
   const [nodeChatId,    setNodeChatId]    = useState(null)
   const [showNodeChats, setShowNodeChats] = useState(false)
+  const [savedTemplates, setSavedTemplates] = useState(() => {
+    try {
+      const raw = localStorage.getItem('vizio_saved_templates')
+      return raw ? JSON.parse(raw) : []
+    } catch { return [] }
+  })
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
 
   const dragStep = useRef(null)
   const dragOver = useRef(null)
@@ -168,11 +178,20 @@ export default function NodePage({
 
   useEffect(() => {
     if (!project?.folderPath) return
-    window.electron?.project?.getMedia?.(project.folderPath).then(setProjectFiles)
+    window.electron?.project?.getMedia?.(project.folderPath).then(files => {
+      setProjectFiles(files)
+      setReloadTrigger(t => t + 1)
+    })
     window.electron?.project?.getOutputs?.(project.folderPath).then(setOutputFiles)
     const cfg = settingsStore.getActiveConfig()
     setActiveProvider(cfg?.label ?? cfg?.providerId ?? '—')
   }, [project?.folderPath])
+
+  useEffect(() => {
+    if (page === 'node') {
+      setReloadTrigger(t => t + 1)
+    }
+  }, [page])
 
   async function refreshNodeChats() {
     if (!project?.folderPath) return
@@ -257,6 +276,23 @@ export default function NodePage({
     savePipelines([...pipelines, p])
     setActivePipeId(p.id)
     setShowTemplates(false)
+  }
+
+  function handleSaveTemplate(tpl) {
+    const updated = [...savedTemplates, tpl]
+    setSavedTemplates(updated)
+    try {
+      localStorage.setItem('vizio_saved_templates', JSON.stringify(updated))
+    } catch {}
+    setShowSaveTemplate(false)
+  }
+
+  function handleDeleteTemplate(templateId) {
+    const updated = savedTemplates.filter(t => t.id !== templateId)
+    setSavedTemplates(updated)
+    try {
+      localStorage.setItem('vizio_saved_templates', JSON.stringify(updated))
+    } catch {}
   }
 
   function deletePipeline(id) {
@@ -471,12 +507,13 @@ export default function NodePage({
   return (
     <div className="np-root">
 
-      <NodeMediaLibrary
-        projectFiles={projectFiles}
-        inputFile={inputFile}
-        onSelectFile={setInputFile}
+      <MediaLibrary
         project={project}
-        activeProvider={activeProvider}
+        activeFile={inputFile}
+        onSelectFile={setInputFile}
+        onDeleteFile={file => { if (inputFile?.path === file.path) setInputFile(null) }}
+        onFilesChange={setProjectFiles}
+        reloadTrigger={reloadTrigger}
       />
 
       <main className="np-canvas">
@@ -502,6 +539,15 @@ export default function NodePage({
             <label className="np-icon-btn" title="Import pipeline">
               ↑ <input type="file" accept=".json" style={{display:'none'}} onChange={importPipeline}/>
             </label>
+            <button 
+              className={`np-icon-btn ${(!activePipeline || activePipeline.steps.length === 0) ? 'disabled' : ''}`}
+              title="Save as template" 
+              onClick={() => activePipeline && activePipeline.steps.length > 0 && setShowSaveTemplate(true)}
+              disabled={!activePipeline || activePipeline.steps.length === 0}
+              style={{ opacity: (!activePipeline || activePipeline.steps.length === 0) ? 0.35 : 1 }}
+            >
+              ⭐
+            </button>
 
           </div>
         </div>
@@ -814,97 +860,30 @@ export default function NodePage({
           onTaskUpdate={onTaskUpdate}
           onAppendStep={appendFromWorkflowStep}
           inputFile={inputFile}
+          savedTemplates={savedTemplates}
         />
       </aside>
 
       {showTemplates && (
-        <TemplateModal onSelect={createFromTemplate} onClose={() => setShowTemplates(false)} />
+        <TemplateModal 
+          onSelect={createFromTemplate} 
+          onClose={() => setShowTemplates(false)} 
+          savedTemplates={savedTemplates}
+          onDeleteTemplate={handleDeleteTemplate}
+        />
+      )}
+      {showSaveTemplate && activePipeline && (
+        <SaveTemplateModal
+          pipeline={activePipeline}
+          onSave={handleSaveTemplate}
+          onClose={() => setShowSaveTemplate(false)}
+        />
       )}
     </div>
   )
 }
 
-function NodeMediaLibrary({ projectFiles, inputFile, onSelectFile, project, activeProvider }) {
-  const EXT_COLORS = {
-    mp4:'#8B35CC', mov:'#8B35CC', avi:'#8B35CC', mkv:'#8B35CC', webm:'#8B35CC',
-    mp3:'#1B9FD4', wav:'#1B9FD4', aac:'#1B9FD4', flac:'#1B9FD4',
-    png:'#27AE85',  jpg:'#27AE85', jpeg:'#27AE85', webp:'#27AE85',
-    gif:'#C8A020',
-  }
-  const EXT_GROUPS = {
-    video: ['mp4','mov','avi','mkv','webm','m4v'],
-    audio: ['mp3','wav','aac','flac','m4a','ogg'],
-    image: ['png','jpg','jpeg','webp','gif'],
-  }
 
-  function groupLabel(ext) {
-    for (const [g, exts] of Object.entries(EXT_GROUPS)) {
-      if (exts.includes(ext?.toLowerCase())) return g
-    }
-    return 'other'
-  }
-
-  const grouped = projectFiles.reduce((acc, f) => {
-    const g = groupLabel(f.ext)
-    if (!acc[g]) acc[g] = []
-    acc[g].push(f)
-    return acc
-  }, {})
-
-  return (
-    <aside className="np-library">
-      <div className="np-library-header">
-        <span className="np-section-label">MEDIA</span>
-        <span className="np-file-count">{projectFiles.length} files</span>
-      </div>
-
-      <div className="np-library-list">
-        {projectFiles.length === 0 && (
-          <div className="np-library-empty">No files in project yet</div>
-        )}
-
-        {Object.entries(grouped).map(([group, files]) => (
-          <div key={group} className="np-lib-group">
-            <div className="np-lib-group-label">{group}</div>
-            {files.map(f => (
-              <div
-                key={f.path}
-                className={`np-lib-file ${inputFile?.path === f.path ? 'selected' : ''}`}
-                onClick={() => onSelectFile(f)}
-                title={f.path}
-              >
-                <div
-                  className="np-lib-ext"
-                  style={{ background: EXT_COLORS[f.ext?.toLowerCase()] ?? '#888' }}
-                >
-                  {f.ext?.toUpperCase().slice(0,4)}
-                </div>
-                <div className="np-lib-info">
-                  <div className="np-lib-name">{f.name}</div>
-                  <div className="np-lib-size">{f.size}</div>
-                </div>
-                {inputFile?.path === f.path && <span className="np-lib-check">✓</span>}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-
-      <div className="np-library-footer">
-        <div className="np-section-label" style={{marginBottom:6}}>SESSION</div>
-        {[
-          ['provider', activeProvider],
-          ['files',    `${projectFiles.length}`],
-        ].map(([k,v]) => (
-          <div key={k} className="np-session-row">
-            <span className="np-session-key">{k}</span>
-            <span className="np-session-val">{v}</span>
-          </div>
-        ))}
-      </div>
-    </aside>
-  )
-}
 
 function StepEditor({ step, onUpdate, onClose }) {
   const def = STEP_TYPES[step.type] ?? {}
@@ -1019,7 +998,7 @@ function AddStepPanel({ onAdd }) {
 }
 
 function NodeChatBridge({ project, toolsBlock, projectFiles, outputFiles,
-  activeChatId, onChatSaved, onSessionId, onTaskUpdate, onAppendStep, inputFile }) {
+  activeChatId, onChatSaved, onSessionId, onTaskUpdate, onAppendStep, inputFile, savedTemplates }) {
 
   return (
     <ChatPanel
@@ -1037,31 +1016,144 @@ function NodeChatBridge({ project, toolsBlock, projectFiles, outputFiles,
       attachedFiles={inputFile ? [inputFile.name] : []}
       onClearAttachments={() => {}}
       context="node"
+      savedTemplates={savedTemplates}
+      activeFile={inputFile}
     />
   )
 }
 
-function TemplateModal({ onSelect, onClose }) {
+function TemplateModal({ onSelect, onClose, savedTemplates = [], onLoadTemplate, onDeleteTemplate }) {
+  const [tab, setTab] = useState('saved')
+
+  return (
+    <div className="np-modal-bg" onClick={onClose}>
+      <div className="np-modal" onClick={e=>e.stopPropagation()}>
+        <div className="np-modal-hdr" style={{display:'flex', gap: 16}}>
+          <span style={{cursor:'pointer', color: tab==='saved'?'#fff':'#888', fontWeight: tab==='saved'?600:400}} onClick={()=>setTab('saved')}>Saved Templates</span>
+          <span style={{cursor:'pointer', color: tab==='built-in'?'#fff':'#888', fontWeight: tab==='built-in'?600:400}} onClick={()=>setTab('built-in')}>Built-in</span>
+          <div style={{flex:1}}/>
+          <button className="np-modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="np-modal-grid" style={{maxHeight:'50vh', overflowY:'auto'}}>
+          {tab === 'saved' ? (
+            savedTemplates.length === 0 ? (
+              <div style={{padding:20, color:'#888', fontSize:12, gridColumn:'1/-1', textAlign:'center'}}>No saved templates yet.</div>
+            ) : (
+              savedTemplates.map(t => (
+                <div key={t.id} style={{position:'relative'}}>
+                  <button className="np-tpl-card" onClick={()=>onLoadTemplate?.(t) || onSelect?.(t)} style={{width:'100%', height:'100%'}}>
+                    <div className="np-tpl-icon">{t.icon || '⭐'}</div>
+                    <div className="np-tpl-name">{t.name}</div>
+                    <div className="np-tpl-desc">{t.description}</div>
+                    <div style={{display:'flex', gap:4, marginTop:8, flexWrap:'wrap'}}>
+                      {(t.tags||[]).map(tag => (
+                        <span key={tag} style={{fontSize:9, background:'rgba(255,255,255,0.1)', padding:'2px 6px', borderRadius:4, color:'#ccc'}}>{tag}</span>
+                      ))}
+                    </div>
+                  </button>
+                  <button
+                    className="np-tpl-delete-btn"
+                    style={{
+                      position: 'absolute', top: 8, right: 8,
+                      background: 'transparent', border: 'none',
+                      color: 'rgba(200,216,232,0.4)', fontSize: 18,
+                      cursor: 'pointer', padding: '2px 6px', borderRadius: 4,
+                      zIndex: 10, lineHeight: 1
+                    }}
+                    onClick={(e) => { e.stopPropagation(); onDeleteTemplate?.(t.id) }}
+                    title="Delete template"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))
+            )
+          ) : (
+            TEMPLATES.map(t => (
+              <button key={t.id} className="np-tpl-card" onClick={()=>onSelect(t)}>
+                <div className="np-tpl-icon">{t.icon}</div>
+                <div className="np-tpl-name">{t.name}</div>
+                <div className="np-tpl-desc">{t.description}</div>
+                <div className="np-tpl-dots">
+                  {t.steps.map((s,i)=>(
+                    <span key={i} className="np-tpl-dot" style={{background:stepColor(s.type)}}/>
+                  ))}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SaveTemplateModal({ pipeline, onSave, onClose }) {
+  const [name, setName] = useState(pipeline.name || 'My Template')
+  const [desc, setDesc] = useState(pipeline.description || '')
+  const [icon, setIcon] = useState('⭐')
+  const [tags, setTags] = useState([])
+
+  const ICONS = ['⭐','🎬','📱','✂','🔊','📝','⚡','📦','🔁','🎨']
+  const TAGS = ['video','shorts','captions','audio','batch','ai']
+
+  function toggleTag(t) {
+    setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])
+  }
+
+  function handleSave() {
+    onSave({
+      id: 'tpl_' + Date.now(),
+      name,
+      description: desc,
+      icon,
+      tags,
+      steps: pipeline.steps,
+      savedAt: Date.now()
+    })
+  }
+
   return (
     <div className="np-modal-bg" onClick={onClose}>
       <div className="np-modal" onClick={e=>e.stopPropagation()}>
         <div className="np-modal-hdr">
-          <span>Choose a template</span>
+          <span>Save as Template</span>
           <button className="np-modal-close" onClick={onClose}>×</button>
         </div>
-        <div className="np-modal-grid">
-          {TEMPLATES.map(t => (
-            <button key={t.id} className="np-tpl-card" onClick={()=>onSelect(t)}>
-              <div className="np-tpl-icon">{t.icon}</div>
-              <div className="np-tpl-name">{t.name}</div>
-              <div className="np-tpl-desc">{t.description}</div>
-              <div className="np-tpl-dots">
-                {t.steps.map((s,i)=>(
-                  <span key={i} className="np-tpl-dot" style={{background:stepColor(s.type)}}/>
-                ))}
-              </div>
-            </button>
-          ))}
+        <div className="np-editor-body" style={{padding: '16px'}}>
+          <Field label="Template Name">
+            <input className="np-input" value={name} onChange={e=>setName(e.target.value)} />
+          </Field>
+          <Field label="Description">
+            <input className="np-input" value={desc} onChange={e=>setDesc(e.target.value)} />
+          </Field>
+          <Field label="Icon">
+            <div style={{display:'flex', gap:6, flexWrap:'wrap', marginBottom:8}}>
+              {ICONS.map(ic => (
+                <button key={ic} onClick={()=>setIcon(ic)}
+                  style={{
+                    background: icon===ic ? 'rgba(139,53,204,0.3)' : 'rgba(255,255,255,0.05)',
+                    border: '0.5px solid ' + (icon===ic ? '#8B35CC' : 'rgba(255,255,255,0.1)'),
+                    borderRadius: 4, padding: '4px 8px', cursor: 'pointer'
+                  }}>{ic}</button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Tags">
+            <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
+              {TAGS.map(t => (
+                <button key={t} onClick={()=>toggleTag(t)}
+                  style={{
+                    background: tags.includes(t) ? 'rgba(29,158,117,0.3)' : 'rgba(255,255,255,0.05)',
+                    border: '0.5px solid ' + (tags.includes(t) ? '#1D9E75' : 'rgba(255,255,255,0.1)'),
+                    borderRadius: 4, padding: '4px 8px', cursor: 'pointer', fontSize:11, color:'#fff'
+                  }}>{t}</button>
+              ))}
+            </div>
+          </Field>
+          <div style={{marginTop: 16, display:'flex', justifyContent:'flex-end'}}>
+            <button className="np-run-btn" onClick={handleSave}>Save Template</button>
+          </div>
         </div>
       </div>
     </div>

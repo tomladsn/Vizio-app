@@ -14,13 +14,29 @@ const CHAT_MIN       = 120
 const EXECBAR_MIN    = 44
 const EXECBAR_MAX    = 260
 
-export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSessionId, activeChatId, onChatChange, onRegisterLibraryReload, toolsBlock }) {
+export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSessionId, activeChatId, onChatChange, onRegisterLibraryReload, toolsBlock, page }) {
   const [activeFile, setActiveFile] = useState(null)
   const [probeData, setProbeData] = useState(null)
   const [projectFiles, setProjectFiles] = useState([])
   const [outputFiles, setOutputFiles]   = useState([])
   const [reloadTrigger, setReloadTrigger] = useState(0)
   const [chats, setChats] = useState([])
+  const [savedTemplates, setSavedTemplates] = useState([])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('vizio_saved_templates')
+      setSavedTemplates(raw ? JSON.parse(raw) : [])
+    } catch {
+      setSavedTemplates([])
+    }
+  }, [page])
+
+  useEffect(() => {
+    if (page === 'main') {
+      setReloadTrigger(t => t + 1)
+    }
+  }, [page])
 
   // Resizable panel widths
   const [libraryWidth,  setLibraryWidth]  = useState(220)
@@ -328,6 +344,7 @@ export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSe
             onClearAttachments={(names) => setAttachedFiles(names ?? [])}
             onMentionFiles={handleAttachFiles}
             onPendingWorkflow={setPendingWorkflow}
+            savedTemplates={savedTemplates}
           />
         </div>
       </div>

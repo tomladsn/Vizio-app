@@ -267,7 +267,6 @@ function AuroraCanvas({
   )
 }
 
-// icon.png goes in demo/public/icon.png
 
 // ── SceneIntro ────────────────────────────────────────────────────────────────
 //
@@ -412,7 +411,7 @@ export function SceneIntro() {
           color: 'rgba(200,216,232,0.72)',
           letterSpacing: '0.01em',
         }}>
-          You have files. They need work.
+          You have files that need work.
         </span>
       </div>
 

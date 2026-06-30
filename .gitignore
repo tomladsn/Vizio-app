@@ -31,7 +31,6 @@ lerna-debug.log*
 .env.production.local
 *.pem
 
-
 src/store/settingsStore.js
 src/store/systemPrompts.js
 resources/

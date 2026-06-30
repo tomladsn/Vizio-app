@@ -10,7 +10,6 @@
     "dev:web": "vite",
     "build": "vite build && electron-builder",
     "preview": "vite preview",
-    "codemap": "node codemap.js",
     "test-bins": "node scripts/test-bins.js"
   },
   "dependencies": {

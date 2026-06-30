@@ -77,12 +77,19 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
   }
 
   function handleDeleteCancel() {
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur()
+    }
     setConfirmingDelete(null)
   }
 
   async function handleDeleteConfirm() {
     const file = confirmingDelete
     if (!file) return
+    
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur()
+    }
     setConfirmingDelete(null)
 
     const result = await window.electron.project.deleteMedia(file.path, project.folderPath)
@@ -129,6 +136,10 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
     if (selected.size === 0) return
     const msg = `Are you sure you want to delete ${selected.size} selected file${selected.size === 1 ? '' : 's'}?`
     if (!confirm(msg)) return
+
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur()
+    }
 
     setDeleteError(null)
     const paths = Array.from(selected)

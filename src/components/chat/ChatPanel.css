@@ -129,6 +129,7 @@
 
 /* ── Input area ── */
 .chat-input-wrap {
+  position: relative;
   flex-shrink: 0;
   padding: 10px 14px 14px;
   background: var(--bg-base);
@@ -685,6 +686,33 @@
   cursor: not-allowed;
 }
 
+.attach-pipeline-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 0.5px solid var(--border-mid);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.attach-pipeline-icon:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--accent-border);
+  background: var(--accent-dim);
+}
+
+.attach-pipeline-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Streaming bubble styling */
 .streaming-container {
   max-width: 90%;
@@ -839,3 +867,78 @@
                   color:rgba(200,216,232,0.7); font-size:11px; padding:6px;
                   cursor:pointer; transition:background 0.12s; }
 .pp-add-all-btn:hover { background:linear-gradient(90deg,rgba(139,53,204,0.25),rgba(27,159,212,0.25)); }
+
+/* ── Template Picker Popover ────────────────────────────────────────────── */
+.template-picker-popover {
+  position: absolute;
+  bottom: 100%;
+  left: 14px;
+  right: 14px;
+  background: var(--bg-raised);
+  border: 0.5px solid var(--border-mid);
+  border-radius: 8px;
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+  z-index: 110;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+}
+
+.template-picker-empty {
+  padding: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.template-picker-item {
+  background: var(--bg-overlay);
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+  font-size: 12px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.template-picker-item:hover {
+  background: var(--bg-surface);
+  border-color: var(--border-strong);
+}
+
+.template-picker-item.selected {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+.template-picker-item-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.template-picker-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.template-picker-item-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.template-picker-item-desc {
+  font-size: 10px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

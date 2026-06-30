@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { settingsStore } from '../../store/settingsStore'
 import { useSecureKeys } from '../../hooks/useSecureKeys'
 import { streamChat, completeChat } from '../../lib/aiBridge'
-import { buildWorkspacePrompt, buildNodePrompt } from '../../store/systemPrompts'
+import { buildWorkspacePrompt } from '../../store/systemPrompts'
 import './ChatPanel.css'
 
 export const TASK_PRESETS = [
@@ -148,6 +148,107 @@ function toJsonFromLooseObject(raw) {
     .replace(/\bFalse\b/g, 'false')
 }
 
+function repairTruncatedJson(jsonString) {
+  let cleaned = jsonString.trim();
+  
+  let stack = [];
+  let inString = false;
+  let escaped = false;
+  
+  for (let i = 0; i < cleaned.length; i++) {
+    const char = cleaned[i];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+    } else {
+      if (char === '"') {
+        inString = true;
+      } else if (char === '{' || char === '[') {
+        stack.push(char);
+      } else if (char === '}' || char === ']') {
+        stack.pop();
+      }
+    }
+  }
+
+  if (inString) {
+    if (escaped) {
+      cleaned = cleaned.slice(0, -1);
+    }
+    cleaned += '"';
+  }
+
+  while (true) {
+    cleaned = cleaned.trim();
+    const lastChar = cleaned[cleaned.length - 1];
+    
+    if (lastChar === ',' || lastChar === ':') {
+      cleaned = cleaned.slice(0, -1);
+      continue;
+    }
+    
+    const trailingPropertyMatch = cleaned.match(/,\s*"[^"]*"\s*$/);
+    if (trailingPropertyMatch) {
+      cleaned = cleaned.slice(0, -trailingPropertyMatch[0].length);
+      continue;
+    }
+    
+    const firstPropertyMatch = cleaned.match(/\{\s*"[^"]*"\s*$/);
+    if (firstPropertyMatch) {
+      cleaned = cleaned.slice(0, -firstPropertyMatch[0].length + 1);
+      continue;
+    }
+
+    break;
+  }
+
+  while (stack.length > 0) {
+    const last = stack.pop();
+    if (last === '{') {
+      cleaned += '}';
+    } else if (last === '[') {
+      cleaned += ']';
+    }
+  }
+
+  return cleaned;
+}
+
+function extractAndRepairJson(text) {
+  const cleaned = text.trim();
+  const normalExtracted = extractFirstJsonValue(cleaned);
+  if (normalExtracted) {
+    try {
+      return JSON.parse(normalExtracted);
+    } catch (_) {}
+  }
+
+  let startIndices = [];
+  for (let i = 0; i < cleaned.length; i++) {
+    if (cleaned[i] === '{' || cleaned[i] === '[') {
+      startIndices.push(i);
+    }
+  }
+
+  for (const startIdx of startIndices) {
+    const candidate = cleaned.slice(startIdx);
+    const repaired = repairTruncatedJson(candidate);
+    try {
+      const parsed = JSON.parse(repaired);
+      if (parsed && typeof parsed === 'object') {
+        return parsed;
+      }
+    } catch (_) {}
+  }
+
+  return null;
+}
+
 function parseLooseAIValue(raw) {
   const jsonLike = extractFirstJsonValue(raw)
   if (!jsonLike) return null
@@ -167,6 +268,9 @@ function parseAIResponse(raw) {
   try {
     return JSON.parse(cleaned)
   } catch (_) { }
+
+  const repaired = extractAndRepairJson(cleaned)
+  if (repaired) return repaired
 
   const valueText = extractFirstJsonValue(cleaned)
   if (valueText) {
@@ -414,6 +518,54 @@ function extractMentionedFiles(text, projectFiles) {
   })
 }
 
+function extractReferencedTemplates(history, inputText, savedTemplates) {
+  if (!savedTemplates || savedTemplates.length === 0) return []
+  
+  const allTexts = [
+    ...(history || []).map(m => m.content || ''),
+    inputText || ''
+  ].join('\n').toLowerCase()
+
+  // Generic trigger phrases — if any appear, auto-include all templates when only one exists,
+  // or include every template that name-matches any word in the message.
+  const genericTriggers = [
+    'node ref', 'this template', 'my template', 'that template',
+    'saved pipeline', 'my pipeline', 'that pipeline', 'this pipeline',
+    'using this', 'apply template', 'apply pipeline', 'use template',
+    'use pipeline', 'run template', 'run pipeline', 'reference',
+  ]
+  const hasGenericRef = genericTriggers.some(trigger => allTexts.includes(trigger))
+
+  const matched = savedTemplates.filter(tpl => {
+    if (!tpl.name) return false
+    const nameLower = tpl.name.toLowerCase()
+    
+    // Exact explicit mention: @name, #name, [name], @[name]
+    const explicitMention = allTexts.includes(`@${nameLower}`) || 
+                            allTexts.includes(`#${nameLower}`) || 
+                            allTexts.includes(`[${nameLower}]`) ||
+                            allTexts.includes(`@[${nameLower}]`)
+    if (explicitMention) return true
+    
+    // Substring name match (> 4 chars to avoid false positives)
+    if (nameLower.length > 4 && allTexts.includes(nameLower)) return true
+
+    // Partial word match — any word from the template name (>= 4 chars) appears in text
+    const nameWords = nameLower.split(/\s+/).filter(w => w.length >= 4)
+    if (nameWords.length > 0 && nameWords.some(word => allTexts.includes(word))) return true
+    
+    return false
+  })
+
+  // If a generic ref phrase is present and no templates matched by name, fall back to all saved templates
+  // (but cap at including all when there are only a few, to avoid noise with large sets)
+  if (hasGenericRef && matched.length === 0) {
+    return savedTemplates.length <= 5 ? [...savedTemplates] : matched
+  }
+
+  return matched
+}
+
 function buildFileBlock(activeFile, probeData, projectFiles = [], inputText = '', attachedFileNames = []) {
   let block = ''
   const usedPaths = new Set()
@@ -619,6 +771,7 @@ export default function ChatPanel({
   onStepCmdUpdate,
   context = 'workspace',
   onConvertStepToNode,
+  savedTemplates = [],
 }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
@@ -626,6 +779,20 @@ export default function ChatPanel({
   const [apiError, setApiError] = useState(null)
   const [attachmentsExpanded, setAttachmentsExpanded] = useState(false)
   const [showMediaPicker, setShowMediaPicker] = useState(false)
+  const [attachedTemplates, setAttachedTemplates] = useState([])
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+
+  function toggleAttachTemplate(tpl) {
+    setAttachedTemplates(prev => {
+      const exists = prev.some(t => t.id === tpl.id)
+      if (exists) {
+        return prev.filter(t => t.id !== tpl.id)
+      } else {
+        return [...prev, tpl]
+      }
+    })
+    setShowTemplatePicker(false)
+  }
   const [editingSourceMessage, setEditingSourceMessage] = useState(null)
 
   const historyRef = useRef([])
@@ -1010,6 +1177,7 @@ export default function ChatPanel({
     }
     setEditingSourceMessage(null)
     onClearAttachments?.()
+    setAttachedTemplates([])
 
     const imageAttachments = attachedFiles.filter(name => {
       const ext = name.split('.').pop().toLowerCase()
@@ -1077,24 +1245,29 @@ export default function ChatPanel({
         attachedFiles,
       )
 
-      const systemPrompt = context === 'node'
-        ? buildNodePrompt({
-            toolsBlock: toolsBlock ?? '## Tools\nffmpeg available\nffprobe available',
-            projectFiles,
-          })
-        : buildWorkspacePrompt({
-            toolsBlock: toolsBlock ?? '## Tools\nffmpeg available\nffprobe available',
-            fileBlock: [
-              buildFileBlock(activeFile, probeData, projectFiles, fullText, attachedFiles),
-              textFileContextBlock,
-            ].filter(Boolean).join('\n\n'),
-            projectStateBlock: buildProjectStateBlock(projectFiles, outputFiles, project?.folderPath, attachedFiles),
-            outputDir: paths.outputDir,
-            workflowContext: [
-              memoryBlock,
-              buildWorkflowContext(workflowStateRef.current),
-            ].filter(Boolean).join('\n\n'),
-          })
+      const referencedTemplates = extractReferencedTemplates(historyRef.current, fullText, savedTemplates)
+      const allTemplates = [...attachedTemplates]
+      referencedTemplates.forEach(refTpl => {
+        if (!allTemplates.some(t => t.id === refTpl.id)) {
+          allTemplates.push(refTpl)
+        }
+      })
+
+      const systemPrompt = buildWorkspacePrompt({
+        toolsBlock: toolsBlock ?? '## Tools\nffmpeg available\nffprobe available',
+        fileBlock: [
+          buildFileBlock(activeFile, probeData, projectFiles, fullText, attachedFiles),
+          textFileContextBlock,
+        ].filter(Boolean).join('\n\n'),
+        projectStateBlock: buildProjectStateBlock(projectFiles, outputFiles, project?.folderPath, attachedFiles),
+        outputDir: paths.outputDir,
+        workflowContext: [
+          memoryBlock,
+          buildWorkflowContext(workflowStateRef.current),
+        ].filter(Boolean).join('\n\n'),
+        savedTemplates: allTemplates,
+        isNodeContext: context === 'node',
+      })
 
       const requestMessages = buildRequestMessages(systemPrompt, historyRef.current)
       let messagesForAI = requestMessages
@@ -1330,15 +1503,47 @@ export default function ChatPanel({
           </div>
         )}
 
-        {attachedFiles.length > 0 && (
+        {showTemplatePicker && (
+          <div
+            className="template-picker-popover"
+            style={{ gridTemplateColumns: savedTemplates.length > 0 ? '1fr 1fr' : '1fr' }}
+          >
+            {savedTemplates.length === 0 ? (
+              <div className="template-picker-empty">
+                No saved templates found.<br />
+                Create and save a pipeline in the <strong>Nodes</strong> tab first.
+              </div>
+            ) : (
+              savedTemplates.map(tpl => {
+                const selected = attachedTemplates.some(t => t.id === tpl.id)
+                return (
+                  <button
+                    key={tpl.id}
+                    className={`template-picker-item ${selected ? 'selected' : ''}`}
+                    type="button"
+                    onClick={() => toggleAttachTemplate(tpl)}
+                  >
+                    <span className="template-picker-item-icon">{tpl.icon || '⭐'}</span>
+                    <div className="template-picker-item-content">
+                      <div className="template-picker-item-name">{tpl.name}</div>
+                      <div className="template-picker-item-desc">{tpl.description}</div>
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        )}
+
+        {(attachedFiles.length > 0 || attachedTemplates.length > 0) && (
           <div
             className="chat-attachments"
             onMouseEnter={() => setAttachmentsExpanded(true)}
             onMouseLeave={() => setAttachmentsExpanded(false)}
           >
-            {(attachmentsExpanded || attachedFiles.length <= 3
+            {(attachmentsExpanded || (attachedFiles.length + attachedTemplates.length) <= 3
               ? attachedFiles
-              : attachedFiles.slice(0, 2)
+              : attachedFiles.slice(0, Math.max(0, 3 - attachedTemplates.length))
             ).map(name => {
               const isImage = ['png','jpg','jpeg','webp','gif'].includes(name.split('.').pop().toLowerCase())
               const fileObj = isImage ? projectFiles.find(f => f.name === name) : null
@@ -1365,9 +1570,38 @@ export default function ChatPanel({
                 </span>
               )
             })}
-            {!attachmentsExpanded && attachedFiles.length > 3 && (
+
+            {(attachmentsExpanded || (attachedFiles.length + attachedTemplates.length) <= 3
+              ? attachedTemplates
+              : attachedTemplates.slice(0, Math.max(0, 3 - attachedFiles.length))
+            ).map(tpl => (
+              <span 
+                key={tpl.id} 
+                className="attachment-chip" 
+                style={{ 
+                  background: 'rgba(139, 53, 204, 0.12)', 
+                  borderColor: 'rgba(139, 53, 204, 0.28)',
+                  color: '#C8D4EE'
+                }}
+              >
+                <span style={{marginRight: 4}}>{tpl.icon || '⭐'}</span>
+                {tpl.name}
+                <button
+                  className="attachment-remove"
+                  onClick={() => setAttachedTemplates(prev => prev.filter(t => t.id !== tpl.id))}
+                  title="Remove"
+                  style={{color: 'rgba(139, 53, 204, 0.6)'}}
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </span>
+            ))}
+
+            {!attachmentsExpanded && (attachedFiles.length + attachedTemplates.length) > 3 && (
               <span className="attachment-chip attachment-more">
-                +{attachedFiles.length - 2} more
+                +{(attachedFiles.length + attachedTemplates.length) - 2} more
               </span>
             )}
           </div>
@@ -1385,6 +1619,17 @@ export default function ChatPanel({
               <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.6" />
               <circle cx="9" cy="10" r="1.6" fill="currentColor" />
               <path d="M6 16l4-4 3 3 3-2 2 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button
+            className="attach-pipeline-icon"
+            type="button"
+            disabled={!isReady || loading}
+            onClick={() => setShowTemplatePicker(prev => !prev)}
+            title="Add pipeline template as context"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           <textarea

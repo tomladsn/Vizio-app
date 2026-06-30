@@ -16,6 +16,33 @@ export default function PreviewPanel({ project, activeFile, sessionId, onMention
   const splitRef                    = useRef(null)
   const splitDraggingRef            = useRef(null)
 
+  // ── Reset session state on project change ────────────────────────────────
+  useEffect(() => {
+    setAllSessions([])
+    setViewingSession(null)
+    setSessionData(null)
+    setPollError(null)
+  }, [project?.folderPath])
+
+  // ── Load persisted sessions for this project on mount / project change ──────
+  useEffect(() => {
+    if (!project?.folderPath) return
+    window.electron.listProjectSessions(project.folderPath)
+      .then(ids => {
+        if (!ids?.length) return
+        setAllSessions(prev => {
+          const merged = [...ids]
+          for (const id of prev) {
+            if (!merged.includes(id)) merged.push(id)
+          }
+          return merged
+        })
+        // If no session is currently being viewed, default to the most recent one
+        setViewingSession(v => v ?? ids[ids.length - 1])
+      })
+      .catch(() => {})
+  }, [project?.folderPath])
+
   // ── New session arrived ────────────────────────────────────────────────────
   useEffect(() => {
     if (!sessionId) return
@@ -90,6 +117,9 @@ export default function PreviewPanel({ project, activeFile, sessionId, onMention
 
   async function handleDeleteOutput(filePath) {
     if (!confirm('Are you sure you want to delete this output file?')) return
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur()
+    }
     const res = await window.electron.project.deleteMedia(filePath, project.folderPath)
     if (res?.ok) {
       const files = await window.electron.project.getOutputs(project.folderPath)

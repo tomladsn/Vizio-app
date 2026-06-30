@@ -15,26 +15,22 @@
 
 ---
 
-Vizio is a desktop AI agent for media processing. You describe what you want — compress for Twitter, generate captions, extract clips from a long video, batch convert a folder — and Vizio plans the steps, runs the commands, and fixes its own errors automatically.
+Vizio is a desktop app that uses AI  for media processing (largely video, image and audio processin). You describe what you want —compress for Twitter, generate captions, extract clips from a long video, batch convert a folder— and Vizio plans the steps, runs the commands, and fixes its own errors automatically.
 
-It is not a video editor. There is no timeline, no drag-and-drop trim bar. It is the tool you reach for when you have files that need work and you do not want to spend an hour learning ffmpeg flags or writing shell scripts to do it.
+It is not a video editor. There is no timeline, no drag-and-drop trim bar. It is the tool you reach for when you have files that need work and you do not want to spend an hour learning  and text command flags or writing shell scripts to do it.
 
 ---
 
 ## How it works
 
-You type a goal in plain English. Vizio sends that to an LLM alongside your file metadata and a list of available tools. The model returns a structured JSON workflow — a list of steps with shell commands. Vizio executes each step, streams progress back to you, and if a command fails it sends the error back to the AI, gets a corrected command, and retries automatically up to three times before giving up and explaining what went wrong.
+You type a goal in plain English. Vizio sends that to an LLM alongside your file metadata and a list of available tools. The model returns a structured workflow — a list of steps with shell commands. Vizio executes each step, streams progress back to you, and if a command fails it sends the error back to the AI, gets a corrected command, and retries automatically up to three times before giving up and explaining what went wrong.
 
 ```
-You type:   "generate youtube shorts from this gameplay video"
+You type:   "clip the first 30 seconds from the video and aspect ratio for youtube shorts"
 
-Vizio:      Step 1 — Whisper transcribes the video → .srt
-            Step 2 — AI reads the transcript, picks the best 5 moments → .json
-            Step 3 — ffmpeg clips each timestamp → clip_1.mp4 … clip_5.mp4
-            Step 4 — Whisper captions each clip at 2 words/line → .srt per clip
-            Step 5 — ffmpeg burns captions + scales to 1080×1920 → final shorts
-
-            Done. 5 files in your output folder.
+Vizio:    
+ step 1: command to clip videos
+ step 2: adjust aspect ratio
 ```
 
 Every command that ran, every retry, every fix the AI made — all of it is in the session log.
@@ -43,15 +39,14 @@ Every command that ran, every retry, every fix the AI made — all of it is in t
 
 ## What makes it different
 
-**It executes, not just suggests.** Most "AI + ffmpeg" tools generate the command and copy it to your clipboard. Vizio runs it, watches the exit code, and handles failures without asking you.
+**It executes, not just suggests.** Most "AI + command line" tools generate the command and copy it to your clipboard. Vizio runs it, watches the exit code, and handles failures without asking you.
 
 **Self-healing.** When a step fails — wrong codec, missing filter, bad path — the AI reads the actual stderr, writes a corrected command, and retries. You watch it fix itself.
 
 **Everything is saved.** Projects have their own folders. Every chat, every session log, every output file is organized and persists between sessions. Your conversation with the AI has full context of what ran before.
 
-**Bring your own key, keep your own files.** Nothing is uploaded to a cloud service. Your media stays on your machine. API keys are encrypted via the OS credential manager (Windows DPAPI). The AI providers you connect to see only what you send them.
+**Bring your own key, keep your own files.** Nothing is uploaded to a cloud service. Your media stays on your machine. API keys are encrypted via the OS credential manager. The AI providers you connect to see only what you send them.
 
-**Pipelines for repeated work.** If you do the same multi-step workflow regularly — like the YouTube Shorts pipeline above — you can save it as a pipeline on the Node page and run it on any new file without prompting the AI again.
 
 ---
 
@@ -71,6 +66,7 @@ Vizio detects these automatically. Missing ones can be installed from the Tools 
 
 | Tool | What it does |
 |---|---|
+| **python** | dependencies for whisper |
 | **ffmpeg** | Video/audio encoding, filtering, trimming, captioning, scaling |
 | **ffprobe** | Reads codec, resolution, duration, bitrate metadata |
 | **Whisper** | Speech-to-text — generates SRT/VTT/TXT from any audio or video |
@@ -83,12 +79,11 @@ Vizio detects these automatically. Missing ones can be installed from the Tools 
 
 | Provider | Notes |
 |---|---|
-| **Groq** | Recommended for free users — fast inference, generous free tier |
 | **Anthropic** | Claude 3.5 Sonnet / Opus |
 | **OpenAI** | GPT-4o / GPT-4 Turbo |
 | **Ollama** | Fully local, no API key, no internet required |
-| **OpenRouter** | Access to many models through one key |
-| **Any OpenAI-compatible endpoint** | Point at any custom base URL |
+| **OpenRouter** | Access to many models through one key (recommended) |
+
 
 ---
 
@@ -108,13 +103,6 @@ npm install
 npm run dev
 ```
 
-On first launch, create a project by pointing it at a folder. Then open Settings and add your API key. Groq has a free tier — sign up at [console.groq.com](https://console.groq.com) and paste the key in. You are ready.
-
-```bash
-# Build the Windows installer
-npm run build
-# → dist-electron/Vizio-Setup-0.1.0.exe
-```
 
 ---
 
@@ -126,7 +114,6 @@ Vizio-app/
 │   ├── main.js        Workflow runner, pipeline executor, session logger
 │   ├── ffmpeg.js      runFfmpeg, probeFiles, scanTools, binary resolution
 │   ├── aiClient.js    Provider-agnostic callAI + streaming
-│   ├── keyStore.js    OS-encrypted API key storage via safeStorage
 │   └── projectStore.js  Project, media, chat, and session file management
 │
 ├── src/               Renderer — React + Vite
@@ -139,8 +126,6 @@ Vizio-app/
 │   │   ├── chat/             ChatPanel — AI conversation, approval cards
 │   │   ├── preview/          PreviewPanel — before/after, output files, session log
 │   │   └── library/          MediaLibrary — file browser and mention system
-│   └── store/
-│       └── settingsStore.js  Provider, model, and appearance preferences
 │
 └── resources/
     └── bin/win32/     Bundled ffmpeg, ffprobe, ffplay, yt-dlp binaries
@@ -153,9 +138,8 @@ Vizio-app/
 ```bash
 npm run dev        # Vite + Electron (hot reload)
 npm run build      # Production build + NSIS installer
-npm run codemap    # Regenerate CODEMAP.md (architecture snapshot)
-npm run test-bins  # Verify all bundled binaries are working
-```
+Graphify extract   #codemap
+
 
 ---
 
@@ -172,10 +156,9 @@ Issues and pull requests are welcome. If you find a bug, please include the sess
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
 
 ---
 
 <div align="center">
-Built with Electron, React, Vite, and whatever AI provider you have a key for.
+Built with Electron, React and Vite
 </div>

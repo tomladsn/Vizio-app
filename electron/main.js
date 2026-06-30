@@ -490,7 +490,7 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
   fs.mkdirSync(outputDir,  { recursive: true })
   fs.mkdirSync(getLogDir(), { recursive: true })
 
-  const log = createLogger(sessionId)
+  const log = createLogger(sessionId, projectDir)
   log.setStatus('in_progress')
   log.setWorkflow(workflow)
 
@@ -590,6 +590,9 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
         onProgress: (pct) => {
           event.sender.send('agent:stepUpdate', { stepId: step.id, status: 'running', pct })
         },
+        onStderr: (text) => {
+          event.sender.send('agent:stepUpdate', { stepId: step.id, status: 'running', pct: null, stderr: text })
+        },
         onOutput: ({ stream, text }) => {
           event.sender.send('agent:stepOutput', { stepId: step.id, stream, text })
           // Stream output to the session log file
@@ -626,7 +629,7 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
           aiMessage: 'Completed (exit 0)', fixedCommand: null,
         })
         log.updateStepStatus(step.id, 'completed')
-        event.sender.send('agent:stepDone', { stepId: step.id, success: true })
+        event.sender.send('agent:stepDone', { stepId: step.id, success: true, stderr: result.stderr })
         finalResult = result
         stepPassed  = true
         stepResults.push({
@@ -944,7 +947,7 @@ ipcMain.handle('agent:prepareWorkflow', (_, { workflow, sessionId, projectDir, u
     fs.mkdirSync(outputDir, { recursive: true })
     fs.mkdirSync(getLogDir(), { recursive: true })
 
-    const log = createLogger(sessionId)
+    const log = createLogger(sessionId, projectDir)
     log.setMeta({ userGoal, mediaFiles })
     log.setWorkflow(expandWorkflowSteps(workflow))
     log.setStatus('proposed')
@@ -970,6 +973,38 @@ ipcMain.handle('session:readLog', (_, sessionId) => {
   } catch { return null }
 })
 
+ipcMain.handle('session:listForProject', (_, { projectDir }) => {
+  try {
+    const dir = getLogDir()
+    if (!fs.existsSync(dir)) return []
+    const files = fs.readdirSync(dir)
+    const sessions = []
+    for (const file of files) {
+      if (!file.startsWith('session-') || !file.endsWith('.json')) continue
+      try {
+        const filePath = path.join(dir, file)
+        const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+        if (
+          content.projectPath === projectDir ||
+          (content.mediaFiles && content.mediaFiles.some(f => f.startsWith(projectDir)))
+        ) {
+          sessions.push({
+            sessionId: content.sessionId,
+            startedAt: content.startedAt
+          })
+        }
+      } catch (err) {
+        // ignore malformed JSON files
+      }
+    }
+    // Sort by startedAt ascending (oldest first) so they align with chronological order
+    sessions.sort((a, b) => new Date(a.startedAt) - new Date(b.startedAt))
+    return sessions.map(s => s.sessionId)
+  } catch {
+    return []
+  }
+})
+
 ipcMain.handle('session:listFiles', (_, { sessionId, projectDir }) => {
   try {
     const dir = path.join(projectDir, 'sessions', sessionId)
@@ -990,9 +1025,9 @@ ipcMain.handle('session:listFiles', (_, { sessionId, projectDir }) => {
 
 ipcMain.on('shell:openFile', (_, filePath) => shell.openPath(filePath))
 
-ipcMain.handle('session:init', async (_, { sessionId, userGoal, mediaFiles }) => {
+ipcMain.handle('session:init', async (_, { sessionId, userGoal, mediaFiles, projectDir = '' }) => {
   try {
-    const log = createLogger(sessionId)
+    const log = createLogger(sessionId, projectDir)
     log.setMeta({ userGoal, mediaFiles })
     return true
   } catch (err) {
