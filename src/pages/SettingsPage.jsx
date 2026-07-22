@@ -68,13 +68,14 @@ function ApiTab({ settings, shown, onToggleShow, onUpdate }) {
     <>
 
       <section className="settings-section">
-        <div className="section-title">Active provider</div>
-        <p className="section-desc">Select your preferred model provider. Configure keys and models below.</p>
+        <div className="section-title">Connected AI accounts</div>
+        <p className="section-desc">Connect each provider once. Vizio stores credentials securely and uses the selected account for chat and workflows.</p>
         <div className="provider-tabs">
           {PROVIDERS.map(p => {
             const hasKey = p.requiresKey ? hasKeyForProvider(p.id) : true
             const hasModel = !!settings[`${p.id}Model`]?.trim()
             const isReady = hasKey && hasModel
+            const status = isReady ? 'connected' : hasKey ? 'needs model' : 'connect'
             return (
               <button
                 key={p.id}
@@ -86,6 +87,7 @@ function ApiTab({ settings, shown, onToggleShow, onUpdate }) {
                   <span className={`ptab-dot ${isReady ? 'ready' : hasKey ? 'partial' : 'empty'}`} />
                 </div>
                 <div className="ptab-desc">{p.desc}</div>
+                <div className={`ptab-status ${isReady ? 'ready' : hasKey ? 'partial' : 'empty'}`}>{status}</div>
               </button>
             )
           })}
@@ -107,6 +109,24 @@ function ApiTab({ settings, shown, onToggleShow, onUpdate }) {
   )
 }
 
+function buildProviderPayload(pid, settings) {
+  let baseUrl = settings[`${pid}Endpoint`] || null
+  if (pid === 'ollama') {
+    baseUrl = settings.ollamaEndpoint || 'http://localhost:11434'
+    if (baseUrl && !baseUrl.endsWith('/v1') && !baseUrl.endsWith('/v1/')) {
+      baseUrl = baseUrl.replace(/\/$/, '') + '/v1'
+    }
+  }
+
+  return {
+    providerId: pid,
+    baseUrl,
+    model: settings[`${pid}Model`] || '',
+    maxTokens: settings[`${pid}MaxTokens`] ?? 700,
+    temperature: settings[`${pid}Temperature`] ?? 0.2,
+  }
+}
+
 function ProviderConfig({ provider, settings, onUpdate }) {
   const pid = provider.id
   const hints = MODEL_HINTS[pid]
@@ -126,6 +146,7 @@ function ProviderConfig({ provider, settings, onUpdate }) {
   const [showDraft,  setShowDraft]  = useState(false)
   const [keySaving,  setKeySaving]  = useState(false)
   const [keyMsg,     setKeyMsg]     = useState(null) // { ok, text }
+  const [testState,  setTestState]  = useState(null) // { status, text }
 
   const keyId = pid + 'ApiKey'
 
@@ -141,6 +162,7 @@ function ProviderConfig({ provider, settings, onUpdate }) {
     if (!keyDraft.trim()) return
     setKeySaving(true)
     setKeyMsg(null)
+    setTestState(null)
     const res = await window.electron.keys.set(keyId, keyDraft.trim())
     if (res.ok) {
       const hint = await window.electron.keys.getHint(keyId)
@@ -148,10 +170,13 @@ function ProviderConfig({ provider, settings, onUpdate }) {
       setKeyHint(hint.hint)
       setKeyDraft('')   // discard the draft immediately
       setShowDraft(false)
-      setKeyMsg({ ok: true, text: 'Key saved and encrypted.' })
+      setKeyMsg({ ok: true, text: 'Account connected securely.' })
       settingsStore.notifyKeysUpdated()
+      if (hasModel) {
+        await handleTestConnection({ assumesKey: true })
+      }
     } else {
-      setKeyMsg({ ok: false, text: res.message || 'Failed to save key.' })
+      setKeyMsg({ ok: false, text: res.message || 'Failed to connect account.' })
     }
     setKeySaving(false)
     setTimeout(() => setKeyMsg(null), 3000)
@@ -163,10 +188,29 @@ function ProviderConfig({ provider, settings, onUpdate }) {
     setKeyExists(false)
     setKeyHint('')
     setKeyDraft('')
+    setTestState(null)
     setKeySaving(false)
-    setKeyMsg({ ok: true, text: 'Key removed.' })
+    setKeyMsg({ ok: true, text: 'Account disconnected.' })
     settingsStore.notifyKeysUpdated()
     setTimeout(() => setKeyMsg(null), 2000)
+  }
+
+  async function handleTestConnection({ assumesKey = false } = {}) {
+    if (!hasModel) {
+      setTestState({ status: 'err', text: 'Choose a model before testing.' })
+      return
+    }
+    if (provider.requiresKey && !keyExists && !assumesKey) {
+      setTestState({ status: 'err', text: 'Connect this account before testing.' })
+      return
+    }
+
+    setTestState({ status: 'loading', text: 'Testing connection...' })
+    const res = await window.electron.ai.testProvider(buildProviderPayload(pid, settings))
+    setTestState({
+      status: res.ok ? 'ok' : 'err',
+      text: res.ok ? (res.message || 'Connection verified.') : (res.message || 'Connection test failed.'),
+    })
   }
 
   return (
@@ -175,14 +219,14 @@ function ProviderConfig({ provider, settings, onUpdate }) {
       {(provider.requiresKey || pid === 'ollama') && (
         <section className="settings-section">
           <div className="section-title">
-            {provider.label} API key {pid === 'ollama' && <span className="optional-badge">(Optional)</span>}
+            {provider.label} account {pid === 'ollama' && <span className="optional-badge">(Optional)</span>}
           </div>
           <p className="section-desc">
             {pid === 'ollama' ? (
-              <span>Required only if using Ollama Cloud. Leave blank for local Ollama.</span>
+              <span>Use local Ollama without a key, or connect Ollama Cloud with an API key.</span>
             ) : (
               <>
-                Get your key at{' '}
+                Connect with a key from{' '}
                 <a href={`https://${provider.docsUrl}`} target="_blank" rel="noreferrer">
                   {provider.docsUrl}
                 </a>
@@ -192,7 +236,7 @@ function ProviderConfig({ provider, settings, onUpdate }) {
 
           <div className="key-row">
             <div className="key-meta">
-              <div className="key-label">API key</div>
+              <div className="key-label">Connection credential</div>
               <div className="key-env">{pid === 'ollama' ? 'OLLAMA_API_KEY' : provider.envKey}</div>
             </div>
 
@@ -211,11 +255,18 @@ function ProviderConfig({ provider, settings, onUpdate }) {
                     replace
                   </button>
                   <button
+                    className="reveal-btn"
+                    onClick={() => handleTestConnection()}
+                    disabled={testState?.status === 'loading'}
+                  >
+                    {testState?.status === 'loading' ? 'testing...' : 'test'}
+                  </button>
+                  <button
                     className="reveal-btn danger"
                     onClick={handleClearKey}
                     disabled={keySaving}
                   >
-                    clear
+                    disconnect
                   </button>
                 </div>
               )}
@@ -226,7 +277,7 @@ function ProviderConfig({ provider, settings, onUpdate }) {
                   <input
                     type={showDraft ? 'text' : 'password'}
                     className="key-input"
-                    placeholder={keyExists ? 'Enter new key to replace…' : (pid === 'ollama' ? 'optional API key (for Ollama Cloud)...' : provider.keyPlaceholder)}
+                    placeholder={keyExists ? 'Enter new key to replace...' : (pid === 'ollama' ? 'optional API key for Ollama Cloud...' : provider.keyPlaceholder)}
                     value={keyDraft}
                     onChange={e => setKeyDraft(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleSaveKey() }}
@@ -242,7 +293,7 @@ function ProviderConfig({ provider, settings, onUpdate }) {
                     onClick={handleSaveKey}
                     disabled={keySaving || !keyDraft.trim()}
                   >
-                    {keySaving ? 'saving…' : 'save key'}
+                    {keySaving ? 'connecting...' : keyExists ? 'replace' : 'connect'}
                   </button>
                   {keyExists && (
                     <button className="reveal-btn" onClick={() => { setKeyDraft(''); setShowDraft(false) }}>
@@ -256,12 +307,28 @@ function ProviderConfig({ provider, settings, onUpdate }) {
                 <div className={`key-msg ${keyMsg.ok ? 'ok' : 'err'}`}>{keyMsg.text}</div>
               )}
 
+              {testState && (
+                <div className={`connection-test ${testState.status}`}>
+                  {testState.text}
+                </div>
+              )}
+
               {!keyExists && !keyDraft && (
                 <div className="key-status empty">
                   <span>
                     {pid === 'ollama' ? 'optional — leave blank for local Ollama' : 'not set — key will be encrypted on save'}
                   </span>
                 </div>
+              )}
+
+              {pid === 'ollama' && !keyDraft && (
+                <button
+                  className="reveal-btn account-test-btn"
+                  onClick={() => handleTestConnection({ assumesKey: true })}
+                  disabled={testState?.status === 'loading'}
+                >
+                  {testState?.status === 'loading' ? 'testing local...' : 'test local connection'}
+                </button>
               )}
             </div>
           </div>

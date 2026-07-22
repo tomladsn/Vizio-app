@@ -132,6 +132,7 @@ contextBridge.exposeInMainWorld('electron', {
   // AI — all provider calls run in main; keys never sent from renderer
   ai: {
     complete: (payload) => ipcRenderer.invoke('ai:complete', payload),
+    testProvider: (payload) => ipcRenderer.invoke('ai:testProvider', payload),
     startStream: (payload) => ipcRenderer.invoke('ai:streamStart', payload),
     abortStream: (requestId) => ipcRenderer.invoke('ai:streamAbort', requestId),
     onStream: (channel, cb) => {

@@ -180,9 +180,10 @@ export default function ToolsPage({ initialTools, onRescan, isScanning: parentSc
   }, [initialTools])
 
   // Merge static metadata with scan results
+  const scannedList = Array.isArray(scannedTools) ? scannedTools : []
   const mergedTools = TOOLS.map(staticTool => {
     const names = staticTool.scanNames ?? [staticTool.name]
-    const scanned = scannedTools.find(s => names.some(name => s.name.toLowerCase() === name.toLowerCase()))
+    const scanned = scannedList.find(s => names.some(name => s?.name?.toLowerCase() === name.toLowerCase()))
     return {
       ...staticTool,
       installed: scanned ? scanned.available : false,

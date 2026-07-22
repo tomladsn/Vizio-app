@@ -16,7 +16,7 @@ import {
   setEncryptedKey, deleteEncryptedKey, listEncryptedKeyIds,
   getKeyHint, getDecryptedKey, migrateLegacyKeys, hasEncryptedKey, isEncryptionAvailable,
 } from './keyStore.js'
-import { callAI, streamAI, buildAIConfig } from './aiClient.js'
+import { callAI, streamAI, buildAIConfig, testAIConnection } from './aiClient.js'
 
 // ── Secure key store (OS credential manager via safeStorage) ──────────────────
 ipcMain.handle('keys:set', (_, { keyId, value }) => {
@@ -63,6 +63,25 @@ ipcMain.handle('ai:complete', async (_, payload) => {
     return { ok: true, text }
   } catch (err) {
     return { ok: false, message: err.message, status: err.status ?? 0, cancelled: !!err.cancelled }
+  }
+})
+
+ipcMain.handle('ai:testProvider', async (_, payload) => {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 20000)
+
+  try {
+    const config = resolveAIConfig(payload)
+    const res = await testAIConnection(config, { signal: controller.signal })
+    return res
+  } catch (err) {
+    return {
+      ok: false,
+      message: err.cancelled ? 'Connection test timed out.' : (err.message || 'Connection test failed.'),
+      status: err.status ?? 0,
+    }
+  } finally {
+    clearTimeout(timeout)
   }
 })
 

@@ -9,6 +9,7 @@
     "dev": "concurrently -n vite,electron -c cyan,yellow \"vite --port 5173\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
     "dev:web": "vite",
     "build": "vite build && electron-builder",
+    "build:web": "vite build",
     "preview": "vite preview",
     "test-bins": "node scripts/test-bins.js"
   },

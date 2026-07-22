@@ -292,3 +292,25 @@ export function buildAIConfig({ providerId, baseUrl, model, maxTokens, temperatu
     apiKey: apiKey ?? '',
   }
 }
+
+export async function testAIConnection(config, { signal } = {}) {
+  if (!config.providerId) throw new Error('Choose a provider first.')
+  if (!config.model?.trim()) throw new Error('Choose or enter a model before testing.')
+  if (config.providerId !== 'ollama' && !config.apiKey?.trim()) {
+    throw new Error('Connect this provider before testing.')
+  }
+
+  const text = await callAI([
+    { role: 'system', content: 'Reply with exactly: OK' },
+    { role: 'user', content: 'Connection test.' },
+  ], {
+    ...config,
+    maxTokens: 8,
+    temperature: 0,
+  }, { retries: 1, signal })
+
+  return {
+    ok: true,
+    message: text ? 'Connection verified.' : 'Provider responded, but returned an empty message.',
+  }
+}
