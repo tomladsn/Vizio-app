@@ -4,24 +4,6 @@ import './ToolsPage.css'
 
 const TOOLS = [
   {
-    id: 'python',
-    scanNames: ['python'],
-    icon: 'py',
-    color: 'blue',
-    name: 'Python',
-    tagline: 'Runtime required for pip-based tools like Whisper and yt-dlp',
-    installed: false,
-    caps: ['pip packages', 'AI tools', 'tool runtime'],
-    requires: ['Windows package manager or python.org installer'],
-    setup: {
-      Windows: [{ label: 'Install Python 3.11 with pip', cmd: 'winget install Python.Python.3.11' }],
-      macOS: [{ label: 'Install Python', cmd: 'brew install python' }],
-      Linux: [{ label: 'Install Python and pip', cmd: 'sudo apt install python3 python3-pip' }],
-      verify: 'python --version',
-      docs: 'https://www.python.org/downloads/',
-    },
-  },
-  {
     id: 'ffmpeg',
     scanNames: ['ffmpeg'],
     icon: 'ff',
@@ -323,6 +305,7 @@ export default function ToolsPage({ initialTools, onRescan, isScanning: parentSc
             <ToolCard
               key={tool.id}
               tool={tool}
+              allScannedTools={scannedList}
               isExpanded={expanded === tool.id}
               onToggle={() => setExpanded(expanded === tool.id ? null : tool.id)}
               installing={installing === tool.id}
@@ -336,11 +319,14 @@ export default function ToolsPage({ initialTools, onRescan, isScanning: parentSc
   )
 }
 
-function ToolCard({ tool, isExpanded, onToggle, installing, installLog, onInstall }) {
+function ToolCard({ tool, allScannedTools, isExpanded, onToggle, installing, installLog, onInstall }) {
   const [os, setOs] = useState(0)
 
   const osList = tool.setup ? Object.keys(tool.setup).filter(k => k !== 'verify' && k !== 'docs') : []
   const steps  = tool.setup ? tool.setup[osList[os]] : []
+
+  const pythonScanned = (allScannedTools || []).find(s => s?.name?.toLowerCase() === 'python')
+  const ffmpegScanned = (allScannedTools || []).find(s => s?.name?.toLowerCase() === 'ffmpeg')
 
   return (
     <div className={`tool-card ${tool.installed ? 'installed' : ''}`}>
@@ -350,13 +336,31 @@ function ToolCard({ tool, isExpanded, onToggle, installing, installLog, onInstal
           <div className="tool-name">
             {tool.name}
             {tool.installed
-              ? <span className="tbadge ok">{tool.bundled ? 'bundled' : 'installed'}</span>
+              ? <span className="tbadge ok">{tool.bundled ? 'bundled' : 'verified & ready'}</span>
               : tool.badge
               ? <span className="tbadge warn">{tool.badge}</span>
               : <span className="tbadge none">not installed</span>
             }
           </div>
           <div className="tool-tagline">{tool.tagline}</div>
+          
+          {tool.id === 'whisper' && (
+            <div className="whisper-dep-pills">
+              <span className={`dep-pill-badge ${pythonScanned?.available ? 'ok' : 'err'}`}>
+                {pythonScanned?.available ? '✓ Python Scanned' : '❌ Python Missing'}
+              </span>
+              <span className={`dep-pill-badge ${pythonScanned?.available ? 'ok' : 'err'}`}>
+                {pythonScanned?.available ? '✓ pip Scanned' : '❌ pip Missing'}
+              </span>
+              <span className={`dep-pill-badge ${ffmpegScanned?.available ? 'ok' : 'err'}`}>
+                {ffmpegScanned?.available ? '✓ ffmpeg Scanned' : '❌ ffmpeg Missing'}
+              </span>
+              {tool.installed && (
+                <span className="dep-pill-badge ok">✓ Whisper Verified</span>
+              )}
+            </div>
+          )}
+
           {tool.id === 'whisper' && tool.installed && tool.whisperModels?.length > 0 && (
             <div className="tool-whisper-summary">
               {tool.whisperModels.length} model{tool.whisperModels.length === 1 ? '' : 's'}: {tool.whisperModels.join(', ')}
@@ -396,6 +400,53 @@ function ToolCard({ tool, isExpanded, onToggle, installing, installLog, onInstal
                 <span className="requirements-label">Requires</span>
                 <div className="requirements-list">
                   {tool.requires.map(req => <span key={req} className="requirement-pill">{req}</span>)}
+                </div>
+              </div>
+            )}
+
+            {tool.id === 'whisper' && (
+              <div className="whisper-verification-checklist">
+                <div className="checklist-title">Whisper & Runtime Verification Status</div>
+                <div className="checklist-grid">
+                  <div className={`checklist-item ${pythonScanned?.available ? 'verified' : 'missing'}`}>
+                    <span className="check-icon">{pythonScanned?.available ? '✓' : '❌'}</span>
+                    <div className="check-info">
+                      <div className="check-name">Python 3.9+ Runtime</div>
+                      <div className="check-status">
+                        {pythonScanned?.available ? `Scanned & Verified (${pythonScanned.version || 'installed'})` : 'Not detected — required to execute Whisper'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={`checklist-item ${pythonScanned?.available ? 'verified' : 'missing'}`}>
+                    <span className="check-icon">{pythonScanned?.available ? '✓' : '❌'}</span>
+                    <div className="check-info">
+                      <div className="check-name">pip Package Installer</div>
+                      <div className="check-status">
+                        {pythonScanned?.available ? 'Scanned & Verified (Python pip)' : 'Not detected'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={`checklist-item ${ffmpegScanned?.available ? 'verified' : 'missing'}`}>
+                    <span className="check-icon">{ffmpegScanned?.available ? '✓' : '❌'}</span>
+                    <div className="check-info">
+                      <div className="check-name">FFmpeg Audio Decoder</div>
+                      <div className="check-status">
+                        {ffmpegScanned?.available ? `Scanned & Verified (${ffmpegScanned.version || 'bundled'})` : 'Not detected — required for audio decoding'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={`checklist-item ${tool.installed ? 'verified' : 'missing'}`}>
+                    <span className="check-icon">{tool.installed ? '✓' : '❌'}</span>
+                    <div className="check-info">
+                      <div className="check-name">OpenAI Whisper Engine</div>
+                      <div className="check-status">
+                        {tool.installed ? `Scanned & Verified (${tool.version || 'installed'})` : 'Not installed — click install below'}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -446,7 +497,7 @@ function ToolCard({ tool, isExpanded, onToggle, installing, installLog, onInstal
           </div>
 
           {tool.installed && tool.version && (
-            <div className="installed-note">✓ {tool.version} detected on your system</div>
+            <div className="installed-note">✓ {tool.version} detected and verified on your system</div>
           )}
 
           {installLog && (

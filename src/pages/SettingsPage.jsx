@@ -33,7 +33,11 @@ export default function SettingsPage() {
           <div className="snav-label">Preferences</div>
           <div className={`snav-item ${activeTab === 'api' ? 'active' : ''}`}
             onClick={() => setActiveTab('api')}>
-            API & models
+            API &amp; models
+          </div>
+          <div className={`snav-item ${activeTab === 'workflow' ? 'active' : ''}`}
+            onClick={() => setActiveTab('workflow')}>
+            Workflow
           </div>
           <div className={`snav-item ${activeTab === 'appearance' ? 'active' : ''}`}
             onClick={() => setActiveTab('appearance')}>
@@ -49,6 +53,9 @@ export default function SettingsPage() {
               onToggleShow={id => setShown(prev => ({ ...prev, [id]: !prev[id] }))}
               onUpdate={update}
             />
+          )}
+          {activeTab === 'workflow' && (
+            <WorkflowTab settings={settings} onUpdate={update} />
           )}
           {activeTab === 'appearance' && (
             <AppearanceTab settings={settings} onUpdate={update} />
@@ -215,6 +222,45 @@ function ProviderConfig({ provider, settings, onUpdate }) {
 
   return (
     <>
+      {pid === 'ollama' && (
+        <section className="settings-section ollama-banner-card">
+          <div className="ollama-banner-inner">
+            <div className="ollama-banner-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+              </svg>
+            </div>
+            <div className="ollama-banner-body">
+              <div className="ollama-banner-title">Run AI locally &mdash; 100% free &amp; private</div>
+              <div className="ollama-banner-desc">
+                Ollama lets you run powerful models like <strong>Llama 3.2</strong>, <strong>Qwen 2.5</strong>, and <strong>Mistral</strong> directly on your machine. No API key, no cost, no data leaving your device.
+              </div>
+              <div className="ollama-banner-actions">
+                <a
+                  href="https://ollama.com/download"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="ollama-download-btn"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                  Download Ollama
+                </a>
+                <div className="ollama-cmd-hint">
+                  <span className="ollama-cmd-label">then run</span>
+                  <code className="ollama-cmd-code">ollama run llama3.2</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* API key — requiresKey OR Ollama */}
       {(provider.requiresKey || pid === 'ollama') && (
         <section className="settings-section">
@@ -322,13 +368,28 @@ function ProviderConfig({ provider, settings, onUpdate }) {
               )}
 
               {pid === 'ollama' && !keyDraft && (
-                <button
-                  className="reveal-btn account-test-btn"
-                  onClick={() => handleTestConnection({ assumesKey: true })}
-                  disabled={testState?.status === 'loading'}
-                >
-                  {testState?.status === 'loading' ? 'testing local...' : 'test local connection'}
-                </button>
+                <div className="ollama-test-row">
+                  <button
+                    className="ollama-test-btn"
+                    onClick={() => handleTestConnection({ assumesKey: true })}
+                    disabled={testState?.status === 'loading'}
+                  >
+                    {testState?.status === 'loading' ? (
+                      <>
+                        <span className="ollama-test-spinner" />
+                        Testing connection&hellip;
+                      </>
+                    ) : (
+                      <>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                          <polyline points="22 4 12 14.01 9 11.01"/>
+                        </svg>
+                        Test local connection
+                      </>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -445,7 +506,7 @@ function ProviderConfig({ provider, settings, onUpdate }) {
                 checked={settings.autoApproveWorkflows || false}
                 onChange={e => onUpdate('autoApproveWorkflows', e.target.checked)}
               />
-              Auto-approve workflows (don't ask for permission)
+              Auto-approve workflows (don&apos;t ask for permission)
             </label>
             <div className="field-help" style={{ marginLeft: '22px' }}>When enabled, the AI will immediately execute its planned tasks.</div>
           </div>
@@ -459,6 +520,90 @@ function ProviderConfig({ provider, settings, onUpdate }) {
               onChange={e => onUpdate('contextLength', Number(e.target.value))}
             />
             <div className="field-help">Number of previous messages the AI remembers.</div>
+          </div>
+        </div>
+      </section>
+    </>
+  )
+}
+
+// ─── Workflow Tab ─────────────────────────────────────────────────────────────
+function WorkflowTab({ settings, onUpdate }) {
+  const retries = settings.maxHealingRetries ?? 3
+
+  return (
+    <>
+      <section className="settings-section">
+        <div className="section-title">Self-Healing</div>
+        <p className="section-desc">
+          When a workflow step fails, Vizio automatically asks the AI to diagnose and fix the command. Configure how many times it should retry before giving up.
+        </p>
+
+        <div className="healing-retries-block">
+          <div className="healing-retries-header">
+            <div className="healing-retries-label">Max retry attempts</div>
+            <div className="healing-retries-badge">{retries}</div>
+          </div>
+
+          <div className="healing-slider-wrap">
+            <input
+              type="range"
+              min="1"
+              max="10"
+              step="1"
+              className="healing-slider"
+              value={retries}
+              onChange={e => onUpdate('maxHealingRetries', Number(e.target.value))}
+            />
+            <div className="healing-slider-ticks">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+                <span key={n} className={`healing-tick ${n === retries ? 'active' : ''}`}>{n}</span>
+              ))}
+            </div>
+          </div>
+
+          <div className="healing-presets">
+            {[
+              { label: 'Conservative', value: 1, desc: 'Fast fail, no retries' },
+              { label: 'Default', value: 3, desc: 'Balanced (recommended)' },
+              { label: 'Persistent', value: 5, desc: 'More attempts per step' },
+              { label: 'Maximum', value: 10, desc: 'Try until it works' },
+            ].map(p => (
+              <button
+                key={p.value}
+                className={`healing-preset-btn ${retries === p.value ? 'active' : ''}`}
+                onClick={() => onUpdate('maxHealingRetries', p.value)}
+              >
+                <span className="healing-preset-label">{p.label}</span>
+                <span className="healing-preset-val">{p.value}×</span>
+                <span className="healing-preset-desc">{p.desc}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="field-help" style={{ marginTop: 8 }}>
+            Higher values give the AI more chances to self-correct failing commands, but may increase total workflow time.
+          </div>
+        </div>
+      </section>
+
+      <section className="settings-section">
+        <div className="section-title">Execution</div>
+        <p className="section-desc">Control how workflows are approved and run.</p>
+
+        <div className="advanced-grid">
+          <div className="advanced-field" style={{ gridColumn: '1 / -1' }}>
+            <label className="field-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={settings.autoApproveWorkflows || false}
+                onChange={e => onUpdate('autoApproveWorkflows', e.target.checked)}
+              />
+              Auto-approve workflows (don&apos;t ask for permission)
+            </label>
+            <div className="field-help" style={{ marginLeft: '22px' }}>
+              When enabled, the AI will immediately execute its planned tasks without showing you a preview first.
+            </div>
           </div>
         </div>
       </section>

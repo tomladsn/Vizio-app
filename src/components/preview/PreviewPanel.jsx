@@ -638,12 +638,12 @@ function VideoPane({ label, file, projectDir, processed, seekTime, setSeekTime }
       <div className="pane-screen">
         <div className="media-container">
           {isVideo && (
-            <video ref={videoRef} key={filePath} src={`atom://${filePath}`} controls className="preview-media" />
+            <video ref={videoRef} key={filePath} src={`atom://${filePath}`} controls preload="metadata" className="preview-media" />
           )}
           {isAudio && (
             <div className="audio-preview">
               <div className="audio-icon">Audio</div>
-              <audio key={filePath} src={`atom://${filePath}`} controls className="preview-audio" />
+              <audio key={filePath} src={`atom://${filePath}`} controls preload="metadata" className="preview-audio" />
               <div className="audio-name">{name}</div>
             </div>
           )}

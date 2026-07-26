@@ -444,13 +444,17 @@ function runInstallerCommand(command) {
 
 // ── protocol & window ─────────────────────────────────────────────────────────
 
-if (process.platform === 'win32') {
-  app.setAppUserModelId('com.vizio.app')
-}
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'atom', privileges: { secure: true, standard: true, supportFetchAPI: true, stream: true, bypassCSP: true } },
+])
 
 app.whenReady().then(() => {
   protocol.registerFileProtocol('atom', (request, callback) => {
-    const url = request.url.replace(/^atom:\/\//, '')
+    let url = request.url.replace(/^atom:\/\//, '')
+    // Handle leading slashes if present on Windows
+    if (process.platform === 'win32' && url.startsWith('/') && url.includes(':')) {
+      url = url.slice(1)
+    }
     try { return callback(decodeURIComponent(url)) } catch (e) {
       console.error('Failed to register protocol', e)
     }
@@ -497,8 +501,10 @@ app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(
 
 // ── IPC: run workflow ──────────────────────────────────────────────────────────
 
-ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, projectDir, model, providerId, baseUrl, maxTokens, temperature }) => {
+ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, projectDir, model, providerId, baseUrl, maxTokens, temperature, maxHealingRetries }) => {
   const config = resolveAIConfig({ providerId, baseUrl, model, maxTokens, temperature })
+  const MAX_HEAL = (typeof maxHealingRetries === 'number' && maxHealingRetries >= 1) ? maxHealingRetries : MAX_RETRIES
+
   workflow = expandWorkflowSteps(workflow)
   const controller = new AbortController()
   workflowControllers.set(sessionId, controller)
@@ -575,11 +581,11 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
     let stepPassed     = false
     let finalResult    = null
 
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    for (let attempt = 1; attempt <= MAX_HEAL; attempt++) {
       if (attempt > 1) {
         event.sender.send('agent:stepUpdate', {
           stepId: step.id, status: 'running', pct: 0,
-          message: 'Retrying (attempt ' + attempt + '/' + MAX_RETRIES + ')…',
+          message: 'Retrying (attempt ' + attempt + '/' + MAX_HEAL + ')…',
         })
       }
 
@@ -694,7 +700,7 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
           exitSuccess: false, aiSuccess: false,
           aiMessage: 'AI verify failed: ' + aiErr.message, fixedCommand: null,
         })
-        if (attempt === MAX_RETRIES) {
+        if (attempt === MAX_HEAL) {
           log.updateStepStatus(step.id, 'failed')
           const msg = 'Step "' + step.title + '" could not be verified: ' + aiErr.message
           event.sender.send('agent:stepDone', { stepId: step.id, success: false, message: msg })
@@ -745,7 +751,7 @@ ipcMain.handle('agent:runWorkflow', async (event, { workflow, sessionId, project
       workflowControllers.delete(sessionId)
       const errorReply = await buildAICompletionReply({
         config, workflow, stepResults,
-        failedStep: { ...step, message: 'Failed after ' + MAX_RETRIES + ' attempts' },
+        failedStep: { ...step, message: 'Failed after ' + MAX_HEAL + ' attempts' },
         outputDir, success: false,
       })
       event.sender.send('agent:done', {

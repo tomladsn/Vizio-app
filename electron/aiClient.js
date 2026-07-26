@@ -4,6 +4,7 @@ function getProviderBaseUrl(providerId) {
     google: 'https://generativelanguage.googleapis.com/v1beta/openai',
     deepseek: 'https://api.deepseek.com',
     openrouter: 'https://openrouter.ai/api/v1',
+    ollama: 'http://localhost:11434/v1',
   }
   return baseUrls[providerId] || null
 }

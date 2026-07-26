@@ -504,6 +504,108 @@
   padding: 4px 0;
 }
 
+.whisper-verification-checklist {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 0.5px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checklist-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: 4px;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 0.5px solid var(--border);
+}
+
+.checklist-item.verified {
+  border-color: var(--green-border);
+  background: rgba(var(--accent-rgb), 0.05);
+}
+
+.checklist-item.missing {
+  border-color: rgba(220, 50, 50, 0.3);
+  background: rgba(220, 50, 50, 0.05);
+}
+
+.check-icon {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.checklist-item.verified .check-icon { color: var(--green-text); }
+.checklist-item.missing .check-icon { color: #f87171; }
+
+.check-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.check-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.check-status {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.whisper-dep-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.dep-pill-badge {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dep-pill-badge.ok {
+  background: var(--green-dim);
+  color: var(--green-text);
+  border: 0.5px solid var(--green-border);
+}
+
+.dep-pill-badge.err {
+  background: rgba(220, 50, 50, 0.15);
+  color: #f87171;
+  border: 0.5px solid rgba(220, 50, 50, 0.3);
+}
+
 .install-log {
   max-height: 180px;
   overflow: auto;

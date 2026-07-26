@@ -175,45 +175,57 @@ export function runFfmpeg(command, { onProgress, onOutput, onStderr, durationSec
 }
 
 // ─── Probe files with ffprobe ─────────────────────────────────────────────────
-export async function probeFiles(filePaths) {
-  const results = []
-  for (const file of filePaths) {
-    const cmd = `"${BIN.ffprobe}" -v quiet -print_format json -show_streams -show_format "${file}"`
-    try {
-      const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 })
-      const raw        = JSON.parse(stdout)
+const PROBE_CACHE = new Map() // filePath -> { mtime, result }
 
-      const streams = (raw.streams ?? []).map(s => ({
-        index:          s.index,
-        type:           s.codec_type,
-        codec:          s.codec_name,
-        profile:        s.profile         ?? null,
-        width:          s.width           ?? null,
-        height:         s.height          ?? null,
-        fps:            s.r_frame_rate    ?? null,
-        pix_fmt:        s.pix_fmt         ?? null,
-        sample_rate:    s.sample_rate     ?? null,
-        channels:       s.channels        ?? null,
-        channel_layout: s.channel_layout  ?? null,
-        bit_rate:       s.bit_rate        ?? null,
-        duration_sec:   s.duration ? parseFloat(s.duration).toFixed(2) : null,
-        language:       s.tags?.language  ?? null,
-      }))
-
-      const format = {
-        filename:     raw.format?.filename,
-        format_name:  raw.format?.format_name,
-        duration_sec: raw.format?.duration ? parseFloat(raw.format.duration).toFixed(2) : null,
-        size_bytes:   raw.format?.size     ?? null,
-        bit_rate:     raw.format?.bit_rate ?? null,
-      }
-
-      results.push({ file, format, streams })
-    } catch (err) {
-      results.push({ file, error: `ffprobe failed: ${err.message}` })
+async function probeSingleFile(file) {
+  try {
+    let stat = null
+    try { stat = fs.statSync(file) } catch (_) {}
+    const mtime = stat ? stat.mtimeMs : 0
+    const cached = PROBE_CACHE.get(file)
+    if (cached && cached.mtime === mtime) {
+      return cached.result
     }
+
+    const cmd = `"${BIN.ffprobe}" -v quiet -print_format json -show_streams -show_format "${file}"`
+    const { stdout } = await execAsync(cmd, { maxBuffer: 10 * 1024 * 1024 })
+    const raw        = JSON.parse(stdout)
+
+    const streams = (raw.streams ?? []).map(s => ({
+      index:          s.index,
+      type:           s.codec_type,
+      codec:          s.codec_name,
+      profile:        s.profile         ?? null,
+      width:          s.width           ?? null,
+      height:         s.height          ?? null,
+      fps:            s.r_frame_rate    ?? null,
+      pix_fmt:        s.pix_fmt         ?? null,
+      sample_rate:    s.sample_rate     ?? null,
+      channels:       s.channels        ?? null,
+      channel_layout: s.channel_layout  ?? null,
+      bit_rate:       s.bit_rate        ?? null,
+      duration_sec:   s.duration ? parseFloat(s.duration).toFixed(2) : null,
+      language:       s.tags?.language  ?? null,
+    }))
+
+    const format = {
+      filename:     raw.format?.filename,
+      format_name:  raw.format?.format_name,
+      duration_sec: raw.format?.duration ? parseFloat(raw.format.duration).toFixed(2) : null,
+      size_bytes:   raw.format?.size     ?? null,
+      bit_rate:     raw.format?.bit_rate ?? null,
+    }
+
+    const result = { file, format, streams }
+    PROBE_CACHE.set(file, { mtime, result })
+    return result
+  } catch (err) {
+    return { file, error: `ffprobe failed: ${err.message}` }
   }
-  return results
+}
+
+export async function probeFiles(filePaths) {
+  return Promise.all(filePaths.map(probeSingleFile))
 }
 
 // ─── Scan installed tools ─────────────────────────────────────────────────────
@@ -559,6 +571,14 @@ export async function scanTools({ force = false } = {}) {
   })
 
   const tools = await Promise.all(checks)
+  const pythonInstalled = pythonCandidates.length > 0
+  tools.push({
+    name: 'Python',
+    available: pythonInstalled,
+    version: pythonInstalled ? (pythonCandidates[0]?.cmd || 'Python 3.x') : null,
+    category: 'Runtime',
+    description: 'Python 3.9+ runtime required for Whisper and pip tools',
+  })
   scanCache = { at: Date.now(), tools }
   return tools
 }

@@ -981,6 +981,7 @@ export default function ChatPanel({
     pushAssistantHistory(historyRef, `Workflow started. ${workflow.message || ''}`.trim())
 
     const cfg = settingsStore.getActiveConfig()
+    const allSettings = settingsStore.get()
     window.electron.runWorkflow({
       workflow,
       sessionId: sid,
@@ -990,6 +991,7 @@ export default function ChatPanel({
       baseUrl: cfg.baseUrl,
       maxTokens: cfg.maxTokens,
       temperature: cfg.temperature,
+      maxHealingRetries: allSettings.maxHealingRetries ?? 3,
     })
   }
 

@@ -506,6 +506,23 @@ export default function NodePage({
 
   return (
     <div className="np-root">
+      <div className="node-coming-soon-overlay">
+        <div className="node-coming-soon-card">
+          <div className="coming-soon-badge">Feature Preview</div>
+          <div className="coming-soon-icon">⬡</div>
+          <h2 className="coming-soon-title">Node Workflow Builder</h2>
+          <div className="coming-soon-tag">Coming Soon</div>
+          <p className="coming-soon-desc">
+            We are working on a visual node-based graph editor for designing custom multi-step media processing pipelines and AI automation chains.
+          </p>
+          <div className="coming-soon-tags">
+            <span>Visual Node Graph</span>
+            <span>Custom FFmpeg Chains</span>
+            <span>AI Step Automation</span>
+            <span>Batch Processing</span>
+          </div>
+        </div>
+      </div>
 
       <MediaLibrary
         project={project}
