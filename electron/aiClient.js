@@ -28,7 +28,7 @@ async function parseErrorResponse(res) {
   try {
     body = await res.json()
   } catch (_) {}
-  const message = body?.error?.message || body?.message || `HTTP ${res.status}`
+  const message = body?.error?.message || body?.message || body?.error || `HTTP ${res.status}`
   const err = new Error(typeof message === 'string' ? message : JSON.stringify(message))
   err.status = res.status
   return err
@@ -159,7 +159,6 @@ export async function callAI(messages, config, { retries = 3, onStatus, signal }
   const maxTokens = Number(config.maxTokens) > 0 ? Number(config.maxTokens) : 2048
   const temperature = Number.isFinite(Number(config.temperature)) ? Number(config.temperature) : 0.2
 
-  // Determine baseUrl if not provided
   if (!baseUrl && providerId !== 'anthropic') {
     baseUrl = getProviderBaseUrl(providerId)
   }
@@ -206,13 +205,14 @@ export async function callAI(messages, config, { retries = 3, onStatus, signal }
 
       if (res.status === 429 || res.status >= 500) {
         const retryAfter = parseInt(res.headers?.get('retry-after') ?? '0', 10)
-        const wait = retryAfter > 0 ? retryAfter * 1000 : Math.min(2000 * attempt, 10000)
+        const wait = retryAfter > 0 ? retryAfter * 1000 : Math.min(2000 * attempt, 8000)
         if (attempt < retries) {
-          onStatus?.({ type: 'retry', message: `Rate limit hit, retrying in ${Math.round(wait/1000)}s...` })
+          const statusText = res.status === 429 ? 'Rate limit hit' : `HTTP ${res.status} error`
+          onStatus?.({ type: 'retry', message: `${statusText}, retrying in ${Math.round(wait/1000)}s...` })
           await sleep(wait, signal)
           continue
         }
-        throw new Error('Rate limit — too many requests. Try again shortly.')
+        throw await parseErrorResponse(res)
       }
 
       if (!res.ok) throw await parseErrorResponse(res)
@@ -226,7 +226,6 @@ export async function callAI(messages, config, { retries = 3, onStatus, signal }
     } catch (err) {
       if (err.cancelled || signal?.aborted) throw err
       if (attempt === retries) throw err
-      if (err.message?.includes('Rate limit')) throw err
       onStatus?.({ type: 'retry', message: `Connection error, retrying in ${attempt}s...` })
       await sleep(1000 * attempt, signal)
     }
@@ -240,7 +239,6 @@ export async function streamAI(messages, config, { onDelta, onStatus, signal } =
   const maxTokens = Number(config.maxTokens) > 0 ? Number(config.maxTokens) : 2048
   const temperature = Number.isFinite(Number(config.temperature)) ? Number(config.temperature) : 0.2
 
-  // Determine baseUrl if not provided
   if (!baseUrl && providerId !== 'anthropic') {
     baseUrl = getProviderBaseUrl(providerId)
   }

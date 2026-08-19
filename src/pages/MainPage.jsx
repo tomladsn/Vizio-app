@@ -138,6 +138,7 @@ export default function MainPage({ project, tasks, onTaskUpdate, sessionId, onSe
       setActiveFile(null)
       setProbeData(null)
     }
+    setAttachedFiles(prev => prev.filter(name => name !== file?.name && name !== file?.path))
   }
 
   async function handleNewChat() {

@@ -1,9 +1,9 @@
-import { app, BrowserWindow, ipcMain, protocol, Menu, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, protocol, Menu, shell, net } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { exec, spawn } from 'child_process'
 import { promisify } from 'util'
-import { fileURLToPath } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 import { BIN, runFfmpeg, probeFiles, scanTools, scanToolsWithBlock, formatToolsBlock, createLogger } from './ffmpeg.js'
 import {
   getAllProjects, createProject, setLastProject, deleteProject,
@@ -442,6 +442,30 @@ function runInstallerCommand(command) {
   })
 }
 
+function getMimeType(filePath) {
+  const ext = path.extname(filePath).toLowerCase()
+  const mimes = {
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.mov': 'video/quicktime',
+    '.mkv': 'video/x-matroska',
+    '.avi': 'video/x-msvideo',
+    '.mp3': 'audio/mpeg',
+    '.wav': 'audio/wav',
+    '.ogg': 'audio/ogg',
+    '.m4a': 'audio/mp4',
+    '.aac': 'audio/aac',
+    '.flac': 'audio/flac',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+  }
+  return mimes[ext] || 'application/octet-stream'
+}
+
 // ── protocol & window ─────────────────────────────────────────────────────────
 
 protocol.registerSchemesAsPrivileged([
@@ -449,14 +473,72 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 app.whenReady().then(() => {
-  protocol.registerFileProtocol('atom', (request, callback) => {
-    let url = request.url.replace(/^atom:\/\//, '')
-    // Handle leading slashes if present on Windows
-    if (process.platform === 'win32' && url.startsWith('/') && url.includes(':')) {
-      url = url.slice(1)
-    }
-    try { return callback(decodeURIComponent(url)) } catch (e) {
-      console.error('Failed to register protocol', e)
+  protocol.handle('atom', (request) => {
+    try {
+      let rawUrl = request.url
+      let urlPath = rawUrl.replace(/^atom:\/\/?\/?/, '')
+      let decoded = decodeURIComponent(urlPath)
+
+      if (process.platform === 'win32') {
+        if (/^\/[a-zA-Z]:/.test(decoded)) {
+          decoded = decoded.slice(1)
+        } else if (/^[a-zA-Z]\//.test(decoded)) {
+          decoded = decoded[0] + ':/' + decoded.slice(2)
+        }
+      }
+
+      const normalizedPath = path.normalize(decoded)
+      if (!fs.existsSync(normalizedPath)) {
+        return new Response('File not found', { status: 404 })
+      }
+
+      const rangeHeader = request.headers.get('range')
+      const stat = fs.statSync(normalizedPath)
+      const fileSize = stat.size
+
+      if (rangeHeader && fileSize > 0) {
+        const parts = rangeHeader.replace(/bytes=/, '').split('-')
+        const start = parseInt(parts[0], 10)
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1
+
+        if (!isNaN(start) && start < fileSize) {
+          const actualEnd = Math.min(end, fileSize - 1)
+          const chunkSize = (actualEnd - start) + 1
+          const nodeStream = fs.createReadStream(normalizedPath, { start, end: actualEnd })
+          const webStream = new ReadableStream({
+            start(controller) {
+              nodeStream.on('data', chunk => controller.enqueue(chunk))
+              nodeStream.on('end', () => controller.close())
+              nodeStream.on('error', err => controller.error(err))
+            },
+            cancel() {
+              nodeStream.destroy()
+            }
+          })
+
+          return new Response(webStream, {
+            status: 206,
+            statusText: 'Partial Content',
+            headers: {
+              'Content-Range': `bytes ${start}-${actualEnd}/${fileSize}`,
+              'Accept-Ranges': 'bytes',
+              'Content-Length': chunkSize.toString(),
+              'Content-Type': getMimeType(normalizedPath),
+            },
+          })
+        }
+      }
+
+      const fileUrl = pathToFileURL(normalizedPath).toString()
+
+      return net.fetch(fileUrl, {
+        bypassCustomProtocolHandlers: true,
+        headers: request.headers,
+        method: request.method,
+      })
+    } catch (e) {
+      console.error('Failed to handle atom protocol request:', e)
+      return new Response('File not found', { status: 404 })
     }
   })
 })

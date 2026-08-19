@@ -665,34 +665,53 @@ function parseAPIError(err, providerId) {
   const label = { groq: 'Groq', openai: 'OpenAI', anthropic: 'Anthropic', gemini: 'Google Gemini', openrouter: 'OpenRouter', ollama: 'Ollama' }[providerId] ?? providerId
   const withDetails = (fallback) => msg && msg !== `HTTP ${status}` ? msg : fallback
 
-  if (status === 401 || lower.includes('invalid api key') || lower.includes('authentication')) {
-    return { type: 'auth', title: 'Invalid API key', body: withDetails(`Your ${label} API key was rejected. Check it in Settings.`) }
-  }
-  if (status === 429 || lower.includes('rate limit')) {
-    const fallback = providerId === 'gemini'
-      ? 'Google Gemini throttled this request. Free tier can still work, but Google may temporarily limit a model, project, or token budget. Try again shortly, switch to gemini-2.5-flash-lite or gemini-2.0-flash, or lower max tokens in Settings.'
-      : `Too many requests from ${label}. Wait a moment and try again.`
-    return { type: 'rate_limit', title: 'Rate limit hit', body: withDetails(fallback) }
-  }
-  if ((lower.includes('token') && (lower.includes('limit') || lower.includes('exceed'))) || lower.includes('context length')) {
-    return { type: 'tokens', title: 'Token limit reached', body: withDetails('This conversation is too long. Start a new session or use a model with a larger context window.') }
-  }
-  if (lower.includes('quota') || lower.includes('billing')) {
-    return { type: 'quota', title: 'API quota exceeded', body: withDetails(`You've run out of credits on ${label}. Check your billing dashboard.`) }
-  }
-  if (lower.includes('model') && (lower.includes('not found') || lower.includes('does not exist'))) {
-    return { type: 'model', title: 'Model not found', body: withDetails('The model name you entered does not exist. Check it in Settings.') }
-  }
-  if (status === 503 || lower.includes('unavailable') || lower.includes('overloaded')) {
-    return { type: 'server', title: 'Provider unavailable', body: withDetails(`${label} is currently down or overloaded. Try again shortly.`) }
-  }
-  if (lower.includes('econnrefused') || lower.includes('failed to fetch') || status === 0) {
+  // 1. Connection / Network / 502 / 504 / Offline / DNS Errors
+  if (
+    status === 502 || status === 504 ||
+    lower.includes('bad gateway') || lower.includes('gateway timeout') ||
+    lower.includes('econnrefused') || lower.includes('failed to fetch') ||
+    lower.includes('networkerror') || lower.includes('fetch failed') ||
+    status === 0
+  ) {
     const networkBody = providerId === 'ollama'
-      ? 'Cannot reach Ollama. Make sure it is running on your machine (try running "ollama serve" in a terminal).'
-      : `Could not connect to ${label}. This is usually a bad network connection — check that you're online and try again.`
-    return { type: 'network', title: 'Connection failed', body: withDetails(networkBody) }
+      ? 'Cannot reach local Ollama. Please verify that your internet is connected or that Ollama is running on your machine ("ollama serve").'
+      : `Could not connect to ${label} (HTTP ${status || 'Network Error'}). This may be caused by an internet connection issue or temporary network gateway failure. Please check your internet connection and try again.`
+    return { type: 'network', title: 'Connection failed (HTTP 502 / Network error)', body: withDetails(networkBody) }
   }
-  return { type: 'unknown', title: 'Something went wrong', body: msg || 'An unexpected error occurred.' }
+
+  // 2. Authentication / Access Denied (401, 403)
+  if (status === 401 || status === 403 || lower.includes('invalid api key') || lower.includes('authentication') || lower.includes('unauthorized') || lower.includes('forbidden')) {
+    return {
+      type: 'auth',
+      title: 'Provider access denied (HTTP 401/403)',
+      body: withDetails(`Your ${label} access was denied or the API key was rejected. Please verify your credentials in Settings or check if your provider account has access to this model.`),
+    }
+  }
+
+  // 3. Quota Exceeded / Rate Limit / Resource Exhausted (429)
+  if (status === 429 || lower.includes('rate limit') || lower.includes('quota') || lower.includes('resource_exhausted') || lower.includes('credit')) {
+    const quotaBody = providerId === 'gemini'
+      ? 'Google Gemini rate limit or quota reached. The provider has limited access to this model for your account or project. Try again shortly, switch to gemini-2.5-flash-lite, or lower max tokens in Settings.'
+      : `Rate limit or quota exceeded on ${label}. The provider has temporarily limited access to this model. Please check your provider account credits/billing or try another model/provider in Settings.`
+    return { type: 'rate_limit', title: 'Provider quota / rate limit reached', body: withDetails(quotaBody) }
+  }
+
+  // 4. Token Length / Context Length Exceeded
+  if ((lower.includes('token') && (lower.includes('limit') || lower.includes('exceed'))) || lower.includes('context length')) {
+    return { type: 'tokens', title: 'Token limit reached', body: withDetails('This conversation exceeds the context window. Please start a new chat or use a model with a larger context window in Settings.') }
+  }
+
+  // 5. Model Not Found (404)
+  if (status === 404 || (lower.includes('model') && (lower.includes('not found') || lower.includes('does not exist')))) {
+    return { type: 'model', title: 'Model not found (HTTP 404)', body: withDetails(`The model specified for ${label} does not exist or is unavailable. Please check the model name in Settings.`) }
+  }
+
+  // 6. Provider Server Error (500, 503)
+  if (status === 500 || status === 503 || lower.includes('unavailable') || lower.includes('overloaded') || lower.includes('internal server error')) {
+    return { type: 'server', title: 'Provider server error (HTTP 500/503)', body: withDetails(`${label} servers are currently experiencing an outage or high demand. Please try again in a few moments.`) }
+  }
+
+  return { type: 'unknown', title: `Something went wrong (${status ? 'HTTP ' + status : 'Error'})`, body: msg || 'An unexpected error occurred.' }
 }
 
 function buildWorkflowContext(state) {
@@ -819,7 +838,8 @@ export default function ChatPanel({
     const el = inputRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 156)}px`
+    const newH = Math.max(34, Math.min(el.scrollHeight, 156))
+    el.style.height = `${newH}px`
   }
 
   useEffect(() => {
@@ -1497,7 +1517,7 @@ export default function ChatPanel({
                   type="button"
                   onClick={() => toggleAttachLibraryFile(file.name)}
                 >
-                  <img src={`atom://${file.path}`} alt="" />
+                  <img src={`atom:///${file.path.replace(/\\/g, '/')}`} alt="" />
                   <span>{file.name}</span>
                 </button>
               )
@@ -1554,7 +1574,7 @@ export default function ChatPanel({
                 <span key={name} className={`attachment-chip ${isImage ? 'image-chip' : ''}`}>
                   {isImage && fileObj && (
                     <img
-                      src={`atom://${fileObj.path}`}
+                      src={`atom:///${fileObj.path.replace(/\\/g, '/')}`}
                       className="chip-thumb"
                       alt=""
                     />
@@ -1608,7 +1628,14 @@ export default function ChatPanel({
             )}
           </div>
         )}
-        <div className="chat-input-area">
+        <div
+          className="chat-input-area"
+          onClick={e => {
+            if (!loading && isReady && !e.target.closest('button')) {
+              inputRef.current?.focus()
+            }
+          }}
+        >
           <button
             ref={attachImageBtnRef}
             className="attach-image-icon"

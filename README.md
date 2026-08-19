@@ -15,9 +15,44 @@
 
 ---
 
-Vizio is a desktop app that uses AI  for media processing (largely video, image and audio processin). You describe what you want —compress for Twitter, generate captions, extract clips from a long video, batch convert a folder— and Vizio plans the steps, runs the commands, and fixes its own errors automatically.
+Vizio is a desktop app that uses AI for media processing (largely video, image, and audio processing). You describe what you want — compress for Twitter, generate captions, extract clips from a long video, batch convert a folder — and Vizio plans the steps, runs the commands, and fixes its own errors automatically.
 
-It is not a video editor. There is no timeline, no drag-and-drop trim bar. It is the tool you reach for when you have files that need work and you do not want to spend an hour learning  and text command flags or writing shell scripts to do it.
+It is not a video editor. There is no timeline, no drag-and-drop trim bar. It is the tool you reach for when you have files that need work and you do not want to spend an hour learning command flags or writing shell scripts to do it.
+
+---
+
+## Getting Started
+
+### 1. Download & Install (Windows)
+You can download and run Vizio directly as a pre-built desktop application. Node.js is not required.
+1. Go to the [Vizio App Website](https://tomladsn.github.io/Vizio-app/) or the GitHub Releases page to download the latest Windows installer (`.exe`).
+2. Run the installer and open **Vizio**.
+
+### 2. Create a Project
+Start by creating a new workspace for your media files to keep your workflows organized.
+
+![Create Project](public/Screenshot%202026-08-11%20154938.png)
+
+### 3. Link Your Model Provider
+To power the AI processing, you need to connect an AI provider. You can link your API keys for providers like Anthropic, OpenAI, or OpenRouter.
+
+![Link Model Provider](public/Screenshot%202026-08-11%20155058.png)
+
+### 4. Check Installed Tools
+Vizio relies on backend tools like FFmpeg, Whisper, and yt-dlp. The Tools page helps you detect which tools are already installed on your system and download the ones you are missing with a single click.
+
+![Tools Configuration](public/Screenshot%202026-08-11%20155344.png)
+
+---
+
+## Other Features
+
+### Workspace & Pipeline Builder
+Vizio features a powerful workspace with an active session log and a visual pipeline builder to sequence complex media workflows using draggable steps.
+
+| Workspace Panel | Visual Pipeline Builder |
+|---|---|
+| ![Workspace](public/Screenshot%202026-08-11%20155114.png) | ![Node Pipeline Page](public/Screenshot%202026-08-11%20155129.png) |
 
 ---
 
@@ -47,17 +82,6 @@ Every command that ran, every retry, every fix the AI made — all of it is in t
 
 **Bring your own key, keep your own files.** Nothing is uploaded to a cloud service. Your media stays on your machine. API keys are encrypted via the OS credential manager. The AI providers you connect to see only what you send them.
 
-
----
-
-## Screenshots
-
-| | |
-|---|---|
-| ![Workspace](docs/workspace.png) | **Workspace** — media library left, session log center, AI chat right |
-| ![Session log](docs/session-log.png) | **Session log** — every command, attempt, and fix logged live |
-| ![Settings](docs/settings.png) | **Settings** — provider, model, theme, accent color |
-
 ---
 
 ## Supported tools
@@ -84,29 +108,25 @@ Vizio detects these automatically. Missing ones can be installed from the Tools 
 | **Ollama** | Fully local, no API key, no internet required |
 | **OpenRouter** | Access to many models through one key (recommended) |
 
-
 ---
 
-## Getting started
+## For Contributors
 
-**Requirements:** Node.js 18+, npm, ffmpeg on your PATH (or use the bundled version).
+If you want to modify Vizio or run it locally from source, you will need Node.js 18+, npm, and FFmpeg (or use the bundled version in `resources/bin/win32`).
 
-```bash
-# Clone
-git clone https://github.com/your-username/Vizio-app.git
-cd Vizio-app
+### Running from Source
+1. Fork the repository and clone it locally using `git clone`.
+2. Open your terminal and navigate to the cloned project directory.
+3. Install the dependencies:
+   ```bash
+   npm install
+   ```
+4. Start the application:
+   ```bash
+   npm run dev
+   ```
 
-# Install
-npm install
-
-# Run
-npm run dev
-```
-
-
----
-
-## Project structure
+### Project structure
 
 ```
 Vizio-app/
@@ -131,31 +151,25 @@ Vizio-app/
     └── bin/win32/     Bundled ffmpeg, ffprobe, ffplay, yt-dlp binaries
 ```
 
----
-
-## Development scripts
+### Development scripts
 
 ```bash
 npm run dev        # Vite + Electron (hot reload)
 npm run build      # Production build + NSIS installer
-Graphify extract   #codemap
-
+graphify extract   # codemap
+```
 
 ---
 
-## Contributing
+## Feedback and Support
 
-Issues and pull requests are welcome. If you find a bug, please include the session log from the relevant run — it contains the exact commands and errors that will make it much faster to diagnose.
-
-1. Fork the repo
-2. Create a branch — `git checkout -b fix/something`
-3. Commit and push
-4. Open a pull request
+If you find a bug or have a suggestion, please open an issue on the repository. When reporting bugs, please include the session log from the relevant run — it contains the exact commands and errors, which makes it much faster to diagnose.
 
 ---
 
 ## License
 
+This project is licensed under the MIT License.
 
 ---
 

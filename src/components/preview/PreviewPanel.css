@@ -1132,3 +1132,56 @@
 .of-btn.delete-btn:hover {
   background: var(--red-dim, rgba(239, 68, 68, 0.1));
 }
+
+/* ── Media Quick Control Bar ── */
+.pane-control-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  background: rgba(15, 15, 15, 0.95);
+  border-top: 0.5px solid var(--border-mid);
+  gap: 12px;
+}
+
+.media-quick-seek,
+.image-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.seek-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.seek-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: var(--blue, #3b82f6);
+  color: #ffffff;
+}
+
+.speed-select {
+  background: rgba(255, 255, 255, 0.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  outline: none;
+  cursor: pointer;
+}
+
+.speed-select option {
+  background: #1e1e2e;
+  color: #ffffff;
+}

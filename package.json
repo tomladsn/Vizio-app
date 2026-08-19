@@ -1,7 +1,7 @@
 {
   "name": "vizio",
   "version": "0.1.0",
-  "author": "Vizio Team",
+  "author": "Tomladsn",
   "description": "AI-powered media agent desktop app for advanced video processing.",
   "main": "electron/main.js",
   "type": "module",

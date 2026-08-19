@@ -508,10 +508,19 @@ function parseSubtitles(text) {
   return items
 }
 
+function toAtomUrl(filePath) {
+  if (!filePath) return ''
+  const clean = filePath.replace(/\\/g, '/').replace(/^\/+/, '')
+  return `atom:///${clean}`
+}
+
 function VideoPane({ label, file, projectDir, processed, seekTime, setSeekTime }) {
   const [textPreview, setTextPreview] = useState(null)
   const [probeInfo, setProbeInfo] = useState(null)
+  const [playbackRate, setPlaybackRate] = useState(1)
+  const [zoom, setZoom] = useState(1)
   const videoRef = React.useRef(null)
+  const audioRef = React.useRef(null)
   
   const filePath = file ? (typeof file === 'string' ? file : file.path) : ''
   const name = file ? (typeof file === 'string' ? filePath.split(/[\\/]/).pop() : file.name) : ''
@@ -544,12 +553,31 @@ function VideoPane({ label, file, projectDir, processed, seekTime, setSeekTime }
     return () => { cancelled = true }
   }, [filePath, isText, projectDir])
 
+  // Safe seek handler
   useEffect(() => {
-    if (seekTime && videoRef.current && isVideo) {
-      videoRef.current.currentTime = seekTime.time
-      videoRef.current.play().catch(() => {})
+    if (!seekTime || (!videoRef.current && !audioRef.current)) return
+    const el = isVideo ? videoRef.current : (isAudio ? audioRef.current : null)
+    if (!el) return
+    const target = seekTime.time
+
+    const doSeek = () => {
+      try {
+        el.currentTime = target
+        el.play().catch(() => {})
+      } catch (_) {}
     }
-  }, [seekTime, isVideo])
+
+    if (el.readyState >= 1) {
+      doSeek()
+    } else {
+      const onLoaded = () => {
+        doSeek()
+        el.removeEventListener('loadedmetadata', onLoaded)
+      }
+      el.addEventListener('loadedmetadata', onLoaded)
+      return () => el.removeEventListener('loadedmetadata', onLoaded)
+    }
+  }, [seekTime, isVideo, isAudio])
 
   useEffect(() => {
     if (!filePath) {
@@ -570,6 +598,20 @@ function VideoPane({ label, file, projectDir, processed, seekTime, setSeekTime }
       })
     return () => { cancelled = true }
   }, [filePath])
+
+  function jumpTime(seconds) {
+    const el = isVideo ? videoRef.current : (isAudio ? audioRef.current : null)
+    if (!el) return
+    const maxDur = el.duration || 0
+    const newTime = Math.max(0, Math.min(maxDur, el.currentTime + seconds))
+    el.currentTime = newTime
+  }
+
+  function handleRateChange(rate) {
+    setPlaybackRate(rate)
+    const el = isVideo ? videoRef.current : (isAudio ? audioRef.current : null)
+    if (el) el.playbackRate = rate
+  }
 
   function formatBytes(bytes) {
     if (!bytes) return ''
@@ -635,20 +677,43 @@ function VideoPane({ label, file, projectDir, processed, seekTime, setSeekTime }
           </span>
         )}
       </div>
+
       <div className="pane-screen">
         <div className="media-container">
           {isVideo && (
-            <video ref={videoRef} key={filePath} src={`atom://${filePath}`} controls preload="metadata" className="preview-media" />
+            <video
+              ref={videoRef}
+              key={filePath}
+              src={toAtomUrl(filePath)}
+              controls
+              preload="auto"
+              className="preview-media"
+            />
           )}
           {isAudio && (
             <div className="audio-preview">
-              <div className="audio-icon">Audio</div>
-              <audio key={filePath} src={`atom://${filePath}`} controls preload="metadata" className="preview-audio" />
+              <div className="audio-icon">🎵 Audio</div>
+              <audio
+                ref={audioRef}
+                key={filePath}
+                src={toAtomUrl(filePath)}
+                controls
+                preload="auto"
+                className="preview-audio"
+              />
               <div className="audio-name">{name}</div>
             </div>
           )}
           {isImage && (
-            <img key={filePath} src={`atom://${filePath}`} alt={name} className="preview-media" />
+            <div className="image-preview-wrap" style={{ overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
+              <img
+                key={filePath}
+                src={toAtomUrl(filePath)}
+                alt={name}
+                className="preview-media"
+                style={{ transform: `scale(${zoom})`, transition: 'transform 0.15s ease', transformOrigin: 'center center' }}
+              />
+            </div>
           )}
           {isSrt && (
             <div className="subtitle-viewer">
@@ -695,6 +760,42 @@ function VideoPane({ label, file, projectDir, processed, seekTime, setSeekTime }
           )}
         </div>
       </div>
+
+      {/* Media quick control bar */}
+      {(isVideo || isAudio || isImage) && (
+        <div className="pane-control-bar">
+          {(isVideo || isAudio) && (
+            <div className="media-quick-seek">
+              <button className="seek-btn" title="Rewind 10s" onClick={() => jumpTime(-10)}>-10s</button>
+              <button className="seek-btn" title="Rewind 5s" onClick={() => jumpTime(-5)}>-5s</button>
+              <button className="seek-btn" title="Forward 5s" onClick={() => jumpTime(5)}>+5s</button>
+              <button className="seek-btn" title="Forward 10s" onClick={() => jumpTime(10)}>+10s</button>
+
+              <select
+                className="speed-select"
+                value={playbackRate}
+                onChange={e => handleRateChange(parseFloat(e.target.value))}
+                title="Playback speed"
+              >
+                <option value={0.5}>0.5x</option>
+                <option value={1.0}>1.0x (Normal)</option>
+                <option value={1.25}>1.25x</option>
+                <option value={1.5}>1.5x</option>
+                <option value={2.0}>2.0x</option>
+              </select>
+            </div>
+          )}
+
+          {isImage && (
+            <div className="image-zoom-controls">
+              <button className="seek-btn" title="Zoom In" onClick={() => setZoom(z => Math.min(z + 0.25, 3))}>+</button>
+              <button className="seek-btn" title="Zoom Out" onClick={() => setZoom(z => Math.max(z - 0.25, 0.5))}>-</button>
+              <button className="seek-btn" title="Reset Zoom" onClick={() => setZoom(1)}>Reset ({Math.round(zoom * 100)}%)</button>
+            </div>
+          )}
+        </div>
+      )}
+
       {metaChips.length > 0 && (
         <div className="pane-meta-bar">
           {metaChips.map((chip, idx) => (

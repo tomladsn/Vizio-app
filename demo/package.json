@@ -1,22 +1,33 @@
 {
   "name": "vizio-demo",
   "version": "1.0.0",
-"scripts": {
-  "start":  "npx remotion studio index.ts",
-  "render": "npx remotion render index.ts VizioDemo out/demo.mp4 --codec=h264",
-  "render:gif": "npx remotion render index.ts VizioDemo out/demo.gif --codec=gif --scale=0.5"
-},
+  "description": "My Remotion video",
+  "repository": {},
+  "license": "UNLICENSED",
+  "private": true,
   "dependencies": {
-    "@remotion/cli": "4.0.0",
-    "remotion":      "4.0.0",
-    "react":         "^18.0.0",
-    "react-dom":     "^18.0.0"
+    "@remotion/cli": "4.0.509",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.509",
+    "@remotion/tailwind-v4": "4.0.509",
+    "tailwindcss": "4.0.0"
   },
   "devDependencies": {
-    "@types/react":  "^18.0.0",
-    "typescript":    "^5.0.0"
+    "@remotion/eslint-config-flat": "4.0.509",
+    "@types/react": "19.2.7",
+    "@types/web": "0.0.166",
+    "eslint": "9.19.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
   },
-  "remotion": {
-    "entryPoint": "index.ts"
-  }
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc"
+  },
+  "sideEffects": [
+    "*.css"
+  ]
 }

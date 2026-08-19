@@ -77,19 +77,12 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
   }
 
   function handleDeleteCancel() {
-    if (document.activeElement && typeof document.activeElement.blur === 'function') {
-      document.activeElement.blur()
-    }
     setConfirmingDelete(null)
   }
 
   async function handleDeleteConfirm() {
     const file = confirmingDelete
     if (!file) return
-    
-    if (document.activeElement && typeof document.activeElement.blur === 'function') {
-      document.activeElement.blur()
-    }
     setConfirmingDelete(null)
 
     const result = await window.electron.project.deleteMedia(file.path, project.folderPath)
