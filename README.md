@@ -52,7 +52,7 @@ Vizio features a powerful workspace with an active session log and a visual pipe
 
 | Workspace Panel | Visual Pipeline Builder |
 |---|---|
-| ![Workspace](public/Screenshot%202026-08-11%20155114.png) | ![Node Pipeline Page](public/Screenshot%202026-08-11%20155129.png) |
+| ![Workspace](public/Workspace.png) | ![Node Pipeline Page](public/nodee.png) |
 
 ---
 

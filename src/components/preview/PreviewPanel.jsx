@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import ContextMenu from '../common/ContextMenu'
 import './PreviewPanel.css'
 
 export default function PreviewPanel({ project, activeFile, sessionId, onMentionFile }) {
@@ -10,6 +11,7 @@ export default function PreviewPanel({ project, activeFile, sessionId, onMention
   const [afterFile,      setAfterFile]      = useState(null)
   const [pollError,      setPollError]      = useState(null)
   const [seekTime,       setSeekTime]       = useState(null)
+  const [contextMenu,    setContextMenu]    = useState(null) // { x, y, file }
 
   // Before/After split resize
   const [beforePct, setBeforePct]   = useState(50)
@@ -212,6 +214,11 @@ export default function PreviewPanel({ project, activeFile, sessionId, onMention
               <div
                 key={f.path}
                 className={`output-file-row ${afterFile?.path === f.path ? 'active' : ''}`}
+                onContextMenu={e => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setContextMenu({ x: e.clientX, y: e.clientY, file: f })
+                }}
               >
                 <div className="of-info">
                   <span className="of-name" title={f.name}>{f.name}</span>
@@ -285,6 +292,58 @@ export default function PreviewPanel({ project, activeFile, sessionId, onMention
             <SessionLog data={sessionData} />
           )}
         </div>
+      )}
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={[
+            {
+              icon: '👁️',
+              label: 'Preview File',
+              action: () => {
+                setAfterFile(contextMenu.file)
+                setActiveTab('preview')
+              },
+            },
+            {
+              icon: '💬',
+              label: 'Mention in Chat',
+              shortcut: '@',
+              action: () => onMentionFile?.(contextMenu.file.name),
+            },
+            { type: 'separator' },
+            {
+              icon: '📤',
+              label: 'Export File...',
+              action: () => handleExport(contextMenu.file.path, contextMenu.file.name),
+            },
+            {
+              icon: '📂',
+              label: 'Reveal in Explorer',
+              action: () => window.electron?.showInFolder?.(contextMenu.file.path),
+            },
+            {
+              icon: '📋',
+              label: 'Copy Path',
+              action: () => navigator.clipboard.writeText(contextMenu.file.path),
+            },
+            {
+              icon: '📂',
+              label: 'Open File',
+              action: () => window.electron?.openFile?.(contextMenu.file.path),
+            },
+            { type: 'separator' },
+            {
+              icon: '🗑️',
+              label: 'Delete Output File',
+              danger: true,
+              action: () => handleDeleteOutput(contextMenu.file.path),
+            },
+          ]}
+        />
       )}
     </div>
   )

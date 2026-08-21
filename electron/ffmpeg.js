@@ -86,11 +86,25 @@ const LOG_DIR = path.join(app.getPath('userData'), 'logs')
 
 // ─── Command cleaner (same as your CLI version) ───────────────────────────────
 function cleanCommand(raw) {
-  return raw
+  let cleaned = raw
     .replace(/```(?:bash|sh|ffmpeg|shell)?/gi, '')
     .replace(/```/g, '')
     .replace(/^\s*\$\s*/gm, '')
     .trim()
+
+  // Pre-flight fixes for common AI model FFmpeg syntax hallucinations
+  if (/^ffmpeg\b/i.test(cleaned)) {
+    // 1. Auto-insert -y overwrite flag if missing so FFmpeg never gets stuck waiting for terminal prompt
+    if (!/\s-y\b/.test(cleaned)) {
+      cleaned = cleaned.replace(/^ffmpeg\b/i, 'ffmpeg -y')
+    }
+    // 2. Fix unescaped single backslashes in Windows file paths inside subtitle filters
+    cleaned = cleaned.replace(/(subtitles=['"][^'"]+)(['"])/gi, (match) => {
+      return match.replace(/\\/g, '/')
+    })
+  }
+
+  return cleaned
 }
 
 // ─── Parse ffmpeg stderr for progress ────────────────────────────────────────
@@ -602,7 +616,28 @@ export function formatToolsBlock(results) {
   }
 
   const available = results.filter(t => t.available).map(t => t.name).join(', ')
-  lines.push(`Usable tools this session: ${available}`)
+  lines.push(`Usable tools this session: ${available}\n`)
+
+  lines.push(`## Standard FFmpeg Command Recipes & Syntax Rules
+Follow these exact, battle-tested syntax templates when generating commands:
+- Always pass -y to overwrite output files without asking for confirmation.
+- Quote all file paths containing spaces with double quotes.
+- TikTok/Vertical 9:16 Compress:
+  ffmpeg -y -i "input.mp4" -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black" -c:v libx264 -crf 23 -c:a aac -b:a 128k "output.mp4"
+- Extract MP3 Audio:
+  ffmpeg -y -i "input.mp4" -vn -c:a libmp3lame -q:a 2 "output.mp3"
+- Convert PNG/JPG to WebP:
+  ffmpeg -y -i "input.png" -c:v libwebp -quality 80 "output.webp"
+- Trim Video Segment:
+  ffmpeg -y -ss 00:00:00 -to 00:00:15 -i "input.mp4" -c:v libx264 -c:a aac "output.mp4"
+- Burn Subtitles (SRT/VTT):
+  ffmpeg -y -i "input.mp4" -vf "subtitles='subtitle.srt'" -c:v libx264 -c:a copy "output.mp4"
+- Extract Subtitles with Whisper:
+  whisper "audio.mp3" --model base --output_format srt --output_dir "."
+- YouTube Download with yt-dlp:
+  yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 -o "output.mp4" "https://..."
+`)
+
   return lines.join('\n')
 }
 

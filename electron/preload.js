@@ -32,9 +32,11 @@ contextBridge.exposeInMainWorld('electron', {
   listProjectSessions: (projectDir) =>
     ipcRenderer.invoke('session:listForProject', { projectDir }),
 
-  // File opening
+  // File opening & OS shell
   openFile: (filePath) =>
     ipcRenderer.send('shell:openFile', filePath),
+  showInFolder: (filePath) =>
+    ipcRenderer.send('shell:showInFolder', filePath),
   getSessionPath: (payload) =>
     ipcRenderer.invoke('agent:getSessionPath', payload),
   prepareWorkflow: (payload) =>

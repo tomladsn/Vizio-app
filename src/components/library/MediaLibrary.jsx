@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import ContextMenu from '../common/ContextMenu'
 import './MediaLibrary.css'
 
 const MEDIA_COLORS = {
@@ -15,6 +16,14 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
   const [selectMode, setSelectMode] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
+  
+  // Right-click context menu state
+  const [contextMenu, setContextMenu] = useState(null) // { x, y, file }
+  
+  // Inline rename state
+  const [renamingFile, setRenamingFile] = useState(null)
+  const [renameValue, setRenameValue]   = useState('')
+
   const dropRef = useRef(null)
 
   // Load project media on mount and when project changes
@@ -27,7 +36,6 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
     const media = await window.electron.project.getMedia(project.folderPath)
     setFiles(media)
     onFilesChange?.(media)
-    // Clean up selected set – remove paths that no longer exist
     setSelected(prev => {
       const validPaths = new Set(media.map(f => f.path))
       const next = new Set([...prev].filter(p => validPaths.has(p)))
@@ -130,10 +138,6 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
     const msg = `Are you sure you want to delete ${selected.size} selected file${selected.size === 1 ? '' : 's'}?`
     if (!confirm(msg)) return
 
-    if (document.activeElement && typeof document.activeElement.blur === 'function') {
-      document.activeElement.blur()
-    }
-
     setDeleteError(null)
     const paths = Array.from(selected)
     let failedCount = 0
@@ -161,6 +165,59 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
     await loadMedia()
   }
 
+  // Handle right-click context menu on file row
+  function handleFileContextMenu(e, file) {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      file,
+    })
+  }
+
+  // Handle right-click context menu on empty space
+  function handleContainerContextMenu(e) {
+    e.preventDefault()
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      file: null,
+    })
+  }
+
+  function startRename(file) {
+    setRenamingFile(file)
+    setRenameValue(file.name)
+  }
+
+  async function handleRenameSubmit() {
+    if (!renamingFile || !renameValue.trim() || renameValue.trim() === renamingFile.name) {
+      setRenamingFile(null)
+      return
+    }
+
+    const oldPath = renamingFile.path
+    const dir = oldPath.substring(0, oldPath.lastIndexOf(/[\/\\]/.test(oldPath) ? oldPath.match(/[\/\\]/)[0] : '\\'))
+    const newPath = `${dir}/${renameValue.trim()}`
+
+    try {
+      const res = await window.electron.agent.renameFile(project.folderPath, oldPath, newPath)
+      if (res?.ok) {
+        await loadMedia()
+        if (activeFile?.path === oldPath) {
+          onSelectFile({ ...renamingFile, name: renameValue.trim(), path: newPath })
+        }
+      } else {
+        setDeleteError(res?.message || 'Failed to rename file.')
+      }
+    } catch (err) {
+      setDeleteError(err.message || 'Failed to rename file.')
+    } finally {
+      setRenamingFile(null)
+    }
+  }
+
   return (
     <div
       ref={dropRef}
@@ -168,6 +225,7 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
+      onContextMenu={handleContainerContextMenu}
     >
       <div className="library-header">
         <span className="section-label">Media</span>
@@ -220,6 +278,39 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
         </div>
       )}
 
+      {/* Inline Rename Bar */}
+      {renamingFile && (
+        <div className="delete-confirm-bar" style={{ borderColor: '#06b6d4' }}>
+          <span className="delete-confirm-text" style={{ color: '#06b6d4' }}>Rename:</span>
+          <input
+            type="text"
+            className="rename-inline-input"
+            value={renameValue}
+            autoFocus
+            onChange={e => setRenameValue(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleRenameSubmit()
+              if (e.key === 'Escape') setRenamingFile(null)
+            }}
+            style={{
+              flex: 1,
+              background: 'rgba(0,0,0,0.5)',
+              border: '1px solid rgba(6,182,212,0.4)',
+              borderRadius: '4px',
+              color: '#ffffff',
+              padding: '2px 6px',
+              fontSize: '11px',
+              fontFamily: 'inherit',
+              outline: 'none',
+            }}
+          />
+          <div className="delete-confirm-actions">
+            <button className="delete-confirm-btn yes" style={{ background: '#06b6d4' }} onClick={handleRenameSubmit}>Save</button>
+            <button className="delete-confirm-btn no" onClick={() => setRenamingFile(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
       {files.length === 0 ? (
         <div className="empty-library" onClick={handleAddMore}>
           <div className="empty-icon">⬇</div>
@@ -243,6 +334,7 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
               onSelect={() => onSelectFile(file)}
               onMention={() => onMentionFile?.(file.name)}
               onDelete={() => handleDeleteRequest(file)}
+              onContextMenu={e => handleFileContextMenu(e, file)}
             />
           ))}
         </div>
@@ -280,15 +372,83 @@ export default function MediaLibrary({ project, activeFile, onSelectFile, onMent
           <div className="drag-hint">Drop to add</div>
         </div>
       )}
+
+      {/* Right-click Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          items={
+            contextMenu.file
+              ? [
+                  {
+                    icon: '💬',
+                    label: 'Mention in Chat',
+                    shortcut: '@',
+                    action: () => onMentionFile?.(contextMenu.file.name),
+                  },
+                  {
+                    icon: '👁️',
+                    label: 'Preview File',
+                    action: () => onSelectFile(contextMenu.file),
+                  },
+                  { type: 'separator' },
+                  {
+                    icon: '✏️',
+                    label: 'Rename File',
+                    shortcut: 'F2',
+                    action: () => startRename(contextMenu.file),
+                  },
+                  {
+                    icon: '📂',
+                    label: 'Reveal in Explorer',
+                    action: () => window.electron?.showInFolder?.(contextMenu.file.path),
+                  },
+                  {
+                    icon: '📋',
+                    label: 'Copy Path',
+                    action: () => navigator.clipboard.writeText(contextMenu.file.path),
+                  },
+                  {
+                    icon: '📋',
+                    label: 'Copy Name',
+                    action: () => navigator.clipboard.writeText(contextMenu.file.name),
+                  },
+                  { type: 'separator' },
+                  {
+                    icon: '🗑️',
+                    label: 'Delete File',
+                    shortcut: 'Del',
+                    danger: true,
+                    action: () => handleDeleteRequest(contextMenu.file),
+                  },
+                ]
+              : [
+                  {
+                    icon: '➕',
+                    label: 'Add Media Files...',
+                    action: handleAddMore,
+                  },
+                  {
+                    icon: '📂',
+                    label: 'Reveal Project Folder',
+                    action: () => window.electron?.showInFolder?.(project?.folderPath),
+                  },
+                ]
+          }
+        />
+      )}
     </div>
   )
 }
 
-function FileRow({ file, active, isConfirming, selectMode, isSelected, onToggleSelect, onSelect, onMention, onDelete }) {
+function FileRow({ file, active, isConfirming, selectMode, isSelected, onToggleSelect, onSelect, onMention, onDelete, onContextMenu }) {
   return (
     <div
       className={`file-item ${active ? 'active' : ''} ${isSelected ? 'selected' : ''} ${isConfirming ? 'confirming' : ''}`}
       onClick={selectMode ? onToggleSelect : onSelect}
+      onContextMenu={onContextMenu}
     >
       {selectMode && (
         <div className="file-checkbox" onClick={e => { e.stopPropagation(); onToggleSelect() }}>

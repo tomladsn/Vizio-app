@@ -33,7 +33,7 @@
     "productName": "Vizio",
     "copyright": "Copyright (c) 2024 Vizio",
     "directories": {
-      "output": "dist-electron",
+      "output": "release",
       "buildResources": "build"
     },
     "files": [

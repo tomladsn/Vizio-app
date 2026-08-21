@@ -814,6 +814,49 @@ export default function ChatPanel({
   }
   const [editingSourceMessage, setEditingSourceMessage] = useState(null)
 
+  // Custom User Preset Commands State
+  const [customPresets, setCustomPresets] = useState(() => {
+    try {
+      const raw = localStorage.getItem('vizio_custom_presets')
+      return raw ? JSON.parse(raw) : []
+    } catch {
+      return []
+    }
+  })
+  const [showPresetModal, setShowPresetModal] = useState(false)
+  const [presetTitle, setPresetTitle] = useState('')
+  const [presetPrompt, setPresetPrompt] = useState('')
+  const [presetCommand, setPresetCommand] = useState('')
+
+  function handleSaveCustomPreset() {
+    if (!presetTitle.trim() || !presetPrompt.trim()) return
+    const newPreset = {
+      id: Date.now().toString(),
+      label: presetTitle.trim(),
+      prompt: presetPrompt.trim(),
+      command: presetCommand.trim(),
+      isCustom: true,
+    }
+    const updated = [...customPresets, newPreset]
+    setCustomPresets(updated)
+    try {
+      localStorage.setItem('vizio_custom_presets', JSON.stringify(updated))
+    } catch {}
+    setShowPresetModal(false)
+    setPresetTitle('')
+    setPresetPrompt('')
+    setPresetCommand('')
+  }
+
+  function handleDeleteCustomPreset(e, id) {
+    e.stopPropagation()
+    const updated = customPresets.filter(p => p.id !== id)
+    setCustomPresets(updated)
+    try {
+      localStorage.setItem('vizio_custom_presets', JSON.stringify(updated))
+    } catch {}
+  }
+
   const historyRef = useRef([])
   const lastInputRef = useRef('')
   const inputRef = useRef(null)
@@ -1369,7 +1412,7 @@ export default function ChatPanel({
         if (trimmedResponse && !narratedToolUse) {
           parsed = { mode: 'chat', message: responseForHistory.trim() }
         } else {
-          addAiMessage('The model answered with narration instead of an executable plan. I need it to return JSON, such as a `write` step for a text report. Please send the prompt again; mentioned text and subtitle files are now included in the request context.', true)
+          addAiMessage('⚠️ The selected AI model returned unformatted plain text instead of a structured workflow response. Please try sending your prompt again, or switch to a more capable model in Settings.', true)
           setLoading(false)
           return
         }
@@ -1425,8 +1468,12 @@ export default function ChatPanel({
 
   const isReady = config.isLocal || isActiveReady
 
-  function applyPreset(prompt) {
-    setInput(prompt)
+  function applyPreset(preset) {
+    let text = typeof preset === 'string' ? preset : preset.prompt
+    if (preset?.command) {
+      text += `\n\nCommand template to execute:\n\`\`\`bash\n${preset.command}\n\`\`\``
+    }
+    setInput(text)
     setTimeout(() => {
       inputRef.current?.focus()
       resizeInput()
@@ -1448,11 +1495,34 @@ export default function ChatPanel({
                   type="button"
                   className="task-preset-chip"
                   disabled={!isReady || loading}
-                  onClick={() => applyPreset(preset.prompt)}
+                  onClick={() => applyPreset(preset)}
                 >
                   {preset.label}
                 </button>
               ))}
+
+              {customPresets.map(preset => (
+                <div key={preset.id} className="task-preset-chip custom-preset-chip" title={preset.command ? `Command: ${preset.command}` : preset.prompt}>
+                  <span onClick={() => applyPreset(preset)}>✨ {preset.label}</span>
+                  <button
+                    type="button"
+                    className="delete-preset-x"
+                    onClick={e => handleDeleteCustomPreset(e, preset.id)}
+                    title="Delete custom preset"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                className="task-preset-chip add-preset-chip"
+                onClick={() => setShowPresetModal(true)}
+                title="Add your custom task command preset"
+              >
+                + Custom Preset
+              </button>
             </div>
           </div>
         )}
@@ -1690,6 +1760,50 @@ export default function ChatPanel({
         </div>
         <div className="input-hint">Enter to send · Shift+Enter for new line · Use @ to mention files</div>
       </div>
+
+      {showPresetModal && (
+        <div className="preset-modal-overlay" onClick={() => setShowPresetModal(false)}>
+          <div className="preset-modal" onClick={e => e.stopPropagation()}>
+            <div className="preset-modal-header">
+              <h3>Create Custom Command Preset</h3>
+              <button className="preset-close-btn" onClick={() => setShowPresetModal(false)}>×</button>
+            </div>
+            <div className="preset-modal-body">
+              <label className="preset-field-label">Preset Title / Button Label</label>
+              <input
+                type="text"
+                className="preset-input"
+                placeholder="e.g., TikTok 60fps 1080p"
+                value={presetTitle}
+                onChange={e => setPresetTitle(e.target.value)}
+              />
+
+              <label className="preset-field-label">Instructions / Task Goal</label>
+              <textarea
+                className="preset-textarea"
+                rows={2}
+                placeholder="e.g., Compress selected video to 1080x1920 60fps vertical format"
+                value={presetPrompt}
+                onChange={e => setPresetPrompt(e.target.value)}
+              />
+
+              <label className="preset-field-label">Exact Working CLI Command (Optional)</label>
+              <textarea
+                className="preset-textarea mono"
+                rows={3}
+                placeholder='e.g., ffmpeg -y -i "{input}" -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black" -r 60 -c:v libx264 "output.mp4"'
+                value={presetCommand}
+                onChange={e => setPresetCommand(e.target.value)}
+              />
+              <div className="preset-hint">If provided, the AI will use this exact tested command for this task.</div>
+            </div>
+            <div className="preset-modal-footer">
+              <button className="preset-cancel-btn" onClick={() => setShowPresetModal(false)}>Cancel</button>
+              <button className="preset-save-btn" disabled={!presetTitle.trim() || !presetPrompt.trim()} onClick={handleSaveCustomPreset}>Save Preset</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

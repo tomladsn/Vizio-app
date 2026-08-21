@@ -1,4 +1,5 @@
 import React from "react";
+import { Gif } from "@remotion/gif";
 import {
   AbsoluteFill,
   Composition,
@@ -11,6 +12,8 @@ import {
   Img,
   staticFile,
 } from "remotion";
+
+import { Audio } from "@remotion/media";
 
 // ============== COLORS ==============
 const COLORS = {
@@ -787,81 +790,155 @@ const LogoScene: React.FC = () => {
     extrapolateRight: "clamp",
   });
 
-  return (
-    <AbsoluteFill
-      style={{
-        background: COLORS.bg,
-        fontFamily:
-          'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          width: 620,
-          height: 620,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(168,85,247,0.18) 0%, rgba(34,211,238,0.08) 45%, transparent 70%)",
-        }}
-      />
+// Soft continuous float
+const floatY = Math.sin(frame / 18) * 10;
 
-      <div
-        style={{
-          transform: `scale(${logoScale})`,
-          filter:
-            "drop-shadow(0 0 50px rgba(34,211,238,0.45)) drop-shadow(0 0 90px rgba(168,85,247,0.3))",
-        }}
-      >
-        <Img
-          src={staticFile("logo.png")}
-          style={{ width: 460, height: 460, objectFit: "contain" }}
-        />
-      </div>
+// Pulsing glow
+const glowPulse = interpolate(Math.sin(frame / 14), [-1, 1], [0.35, 0.7]);
 
-      <h1
-        style={{
-          marginTop: 16,
-          fontSize: 68,
-          fontWeight: 800,
-          color: COLORS.white,
-          letterSpacing: "-0.03em",
-          opacity: textOpacity,
-        }}
-      >
-        Vizio
-      </h1>
-      <p
-        style={{
-          fontSize: 28,
-          color: COLORS.muted,
-          opacity: textOpacity,
-        }}
-      >
-        Your AI media agent
-      </p>
+// Very subtle rotation
+const rotate = Math.sin(frame / 40) * 1.5;
 
-      <div
-        style={{
-          marginTop: 48,
-          background: `linear-gradient(135deg, ${COLORS.cyan}, ${COLORS.purple})`,
-          color: "white",
-          fontSize: 26,
-          fontWeight: 700,
-          padding: "22px 60px",
-          borderRadius: 99,
-          opacity: interpolate(frame, [32, 52], [0, 1]),
-          boxShadow: `0 14px 44px rgba(34,211,238,0.4)`,
-        }}
-      >
-        Download now
-      </div>
-    </AbsoluteFill>
-  );
+// Particles around the logo
+const particles = Array.from({ length: 10 }).map((_, i) => {
+  const angle = (i / 10) * Math.PI * 2 + frame / 50;
+  const radius = 210 + Math.sin(frame / 22 + i * 1.3) * 25;
+  return {
+    x: Math.cos(angle) * radius,
+    y: Math.sin(angle) * radius,
+    size: 4 + (i % 3),
+    delay: i * 2,
+    color: ["#22D3EE", "#4F46E5", "#3B82F6"][i % 3],
+  };
+});
+ return (
+   <AbsoluteFill
+     style={{
+       background: COLORS.bg,
+       fontFamily:
+         'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+       display: "flex",
+       flexDirection: "column",
+       alignItems: "center",
+       justifyContent: "center",
+     }}>
+     <div
+       style={{
+         position: "absolute",
+         width: 620,
+         height: 620,
+         borderRadius: "50%",
+         background:
+           "radial-gradient(circle, rgba(168,85,247,0.18) 0%, rgba(34,211,238,0.08) 45%, transparent 70%)",
+       }}
+     />
+     <div
+       style={{
+         transform: `scale(${logoScale})`,
+         filter:
+           "drop-shadow(0 0 50px rgba(34,211,238,0.45)) drop-shadow(0 0 90px rgba(168,85,247,0.3))",
+       }}
+     >
+    <div
+     style={{
+       position: "absolute",
+       width: 680,
+       height: 680,
+       borderRadius: "50%",
+       background: `radial-gradient(circle, rgba(168,85,247,${0.12 + glowPulse * 0.1}) 0%, rgba(34,211,238,0.07) 40%, transparent 70%)`,
+       transform: `scale(${logoScale})`,
+       left: "50%",
+       top: "42%",
+       marginLeft: -340,
+       marginTop: -340,
+     }}
+   />
+
+   {/* Floating particles */}
+   {particles.map((p, i) => (
+     <div
+       key={i}
+       style={{
+         position: "absolute",
+         left: "50%",
+         top: "42%",
+         width: p.size,
+         height: p.size,
+         borderRadius: "50%",
+         background: p.color,
+         transform: `translate(${p.x}px, ${p.y + floatY * 0.3}px)`,
+         opacity: interpolate(frame, [12 + p.delay, 28 + p.delay], [0, 0.35], {
+           extrapolateRight: "clamp",
+         }),
+         boxShadow: `0 0 6px ${p.color}`,
+       }}
+     />
+   ))}
+
+   {/* Logo with effects */}
+   <div
+     style={{
+       transform: `
+         translateY(${floatY}px)
+         scale(${logoScale * 1.411})
+         rotate(${rotate}deg)
+       `,
+       filter: `
+         drop-shadow(0 0 ${40 + glowPulse * 30}px rgba(34,211,238,${glowPulse}))
+         drop-shadow(0 0 ${70 + glowPulse * 40}px rgba(168,85,247,${glowPulse * 0.7}))
+       `,
+     }}
+   >
+     <Img
+       src={staticFile("icon.png")}
+       style={{
+         width: 260,
+         height: 360,
+         objectFit: "contain",
+         transform: "translateY(61.8px)",
+         translate: "1px -54.9px"
+       }}
+     />
+   </div>
+   </div>
+     <h1
+       style={{
+         marginTop: 16,
+         fontSize: 68,
+         fontWeight: 800,
+         color: COLORS.white,
+         letterSpacing: "-0.03em",
+         opacity: textOpacity,
+       }}
+     >
+       Vizio
+     </h1>
+     <p
+       style={{
+         fontSize: 28,
+         color: COLORS.muted,
+         opacity: textOpacity,
+       }}
+     >
+       Your AI media agent
+     </p>
+     <div
+       style={{
+         marginTop: 48,
+         background: `linear-gradient(135deg, ${COLORS.cyan}, ${COLORS.purple})`,
+         color: "white",
+         fontSize: 26,
+         fontWeight: 700,
+         padding: "22px 60px",
+         borderRadius: 99,
+         opacity: interpolate(frame, [32, 52], [0, 1]),
+         boxShadow: `0 14px 44px rgba(34,211,238,0.4)`,
+       }}
+     >
+       Download now
+     </div>
+   </AbsoluteFill>
+ );
 };
 
 // ============== BETTER TRANSITIONS ==============
@@ -889,7 +966,8 @@ const ScaleSlideTransition: React.FC<{
       style={{
         opacity,
         transform: `scale(${scale}) translateY(${translateY}px)`,
-      }}>
+      }}
+      from={-28}>
       {children}
     </AbsoluteFill>
   );
@@ -898,26 +976,26 @@ const ScaleSlideTransition: React.FC<{
 // ============== MAIN ==============
 export const MyComponent: React.FC = () => {
   return (
-    <AbsoluteFill style={{ backgroundColor: COLORS.bg }}>
-      {/* PART 1 - Chat (longer to allow second mouse click) */}
-      <Sequence from={0} durationInFrames={290}>
-        <ScaleSlideTransition>
-          <ChatScene />
-        </ScaleSlideTransition>
-      </Sequence>
-      {/* PART 2 - Execution */}
-      <Sequence from={275} durationInFrames={220}>
-        <ScaleSlideTransition>
-          <ExecutionScene />
-        </ScaleSlideTransition>
-      </Sequence>
-      {/* PART 3 - Logo */}
-      <Sequence from={480} durationInFrames={160}>
-        <ScaleSlideTransition>
-          <LogoScene />
-        </ScaleSlideTransition>
-      </Sequence>
-    </AbsoluteFill>
+    <><AbsoluteFill style={{ backgroundColor: COLORS.bg }} durationInFrames={506}>
+                {/* PART 1 - Chat (longer to allow second mouse click) */}
+                <Sequence from={0} durationInFrames={290}>
+                  <ScaleSlideTransition>
+                    <ChatScene />
+                  </ScaleSlideTransition>
+                </Sequence>
+                {/* PART 2 - Execution */}
+                <Sequence from={275} durationInFrames={169}>
+                  <ScaleSlideTransition>
+                    <ExecutionScene />
+                  </ScaleSlideTransition>
+                </Sequence>
+                {/* PART 3 - Logo */}
+                <Sequence from={438} durationInFrames={68}>
+                  <ScaleSlideTransition>
+                    <LogoScene />
+                  </ScaleSlideTransition>
+                </Sequence>
+              </AbsoluteFill></>
   );
 };
 

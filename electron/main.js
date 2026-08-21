@@ -1131,6 +1131,9 @@ ipcMain.handle('session:listFiles', (_, { sessionId, projectDir }) => {
 })
 
 ipcMain.on('shell:openFile', (_, filePath) => shell.openPath(filePath))
+ipcMain.on('shell:showInFolder', (_, filePath) => {
+  if (filePath) shell.showItemInFolder(filePath)
+})
 
 ipcMain.handle('session:init', async (_, { sessionId, userGoal, mediaFiles, projectDir = '' }) => {
   try {
